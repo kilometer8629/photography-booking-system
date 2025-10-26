@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensitive Santa – An Inclusive & Calm Santa Experience</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">Santa&nbsp;by&nbsp;STB</div>
+        <button class="nav-toggle" aria-label="Toggle navigation"><i class="fas fa-bars"></i></button>
+        <ul class="nav-menu">
+            <li><a href="index.html">Santa&nbsp;Photos</a></li>
+            <li><a href="sensitive-santa.html" class="active">Sensitive&nbsp;Santa</a></li>
+            <li><a href="pet-photos.html">Santa&nbsp;Pet&nbsp;Photos</a></li>
+            <li><a href="packages.html">Packages</a></li>
+        </ul>
+        <a href="booking.html" class="btn btn-cta">Book&nbsp;Now</a>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero" style="background-image: url('images/sensitive_santa_hero.png');">
+        <div class="hero-overlay">
+            <h1>An Inclusive &amp; Calm Santa Experience</h1>
+            <p>Tailored sessions for children with disability</p>
+            <a href="booking.html" class="btn btn-primary">Book&nbsp;Now</a>
+        </div>
+    </header>
+
+    <!-- What is Sensitive Santa -->
+    <section class="section section-light">
+        <div class="container">
+            <h2 class="section-title">What is Sensitive Santa?</h2>
+            <p>
+                Sensitive Santa offers an inclusive and accessible photo experience designed especially for children 
+                with disability. This special encounter provides a calm and accommodating environment where families 
+                can enjoy a personalised visit tailored to the needs and comfort of each child. With thoughtful 
+                adaptations, such as sensory‑friendly settings and longer time slots, Sensitive Santa ensures every child can 
+                create joyful memories and experience the magic of the holiday season in a way that suits them best.
+            </p>
+        </div>
+    </section>
+
+    <!-- Benefits Section -->
+    <section class="section section-cards">
+        <div class="container">
+            <h2 class="section-title">Benefits of a Sensitive Session</h2>
+            <div class="card-grid">
+                <div class="card">
+                    <i class="fa-solid fa-heart card-icon" aria-hidden="true"></i>
+                    <h3>Inclusive Experience</h3>
+                    <p>Tailored to accommodate various disabilities, ensuring that every child can enjoy the holiday magic.</p>
+                </div>
+                <div class="card">
+                    <i class="fa-solid fa-ear-listen card-icon" aria-hidden="true"></i>
+                    <h3>Sensory‑Friendly</h3>
+                    <p>Designed to minimise overstimulation with quieter settings, soft lighting and gentle interactions.</p>
+                </div>
+                <div class="card">
+                    <i class="fa-solid fa-clock card-icon" aria-hidden="true"></i>
+                    <h3>Longer Session</h3>
+                    <p>Allows for a relaxed, unhurried visit, giving each child ample time to feel comfortable and enjoy the experience.</p>
+                </div>
+                <div class="card">
+                    <i class="fa-solid fa-calendar-days card-icon" aria-hidden="true"></i>
+                    <h3>Outside Hours</h3>
+                    <p>Sessions are scheduled outside regular trading hours to minimise distractions, noise and crowds.</p>
+                </div>
+                <div class="card">
+                    <i class="fa-solid fa-hand-holding-heart card-icon" aria-hidden="true"></i>
+                    <h3>Personal Attention</h3>
+                    <p>Santa and staff are trained to understand and address the unique needs of each child, creating a comfortable visit.</p>
+                </div>
+                <div class="card">
+                    <i class="fa-solid fa-users card-icon" aria-hidden="true"></i>
+                    <h3>Positive Interactions</h3>
+                    <p>Offers an opportunity for children to engage with Santa in a supportive way, fostering positive social experiences.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Booking Section -->
+    <section id="booking" class="section section-dark">
+        <div class="container">
+            <h2 class="section-title">Book a Sensitive Session</h2>
+            <p>
+                We have built a dedicated Santa photos booking platform. The system allows you to book your preferred time and date online, 
+                as well as pre‑pay for your Sensitive Santa photo session.
+            </p>
+            <form id="sensitive-booking-form" class="booking-form" onsubmit="return handleBooking(event)">
+                <label for="ss-location">Location</label>
+                <select id="ss-location" required>
+                    <option value="https://tramshedssydney.com.au/" selected>Tramsheds, 1 Dalgal Way, Forest Lodge NSW 2037</option>
+                </select>
+                <p class="location-link">
+                    <a href="https://tramshedssydney.com.au/" target="_blank" rel="noopener">Visit the Tramsheds website</a>
+                </p>
+                <label for="ss-date">Select Date</label>
+                <input type="date" id="ss-date" required>
+                <label for="ss-time">Select Time</label>
+                <input type="time" id="ss-time" required>
+                <button type="submit" class="btn btn-primary">Submit Booking</button>
+            </form>
+            <p id="ss-booking-message" class="hidden confirmation-message">Thank you! We'll send a confirmation email shortly.</p>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="section section-light">
+        <div class="container">
+            <h2 class="section-title">Questions?</h2>
+            <details>
+                <summary>What makes Sensitive Santa unique?</summary>
+                <p>Sessions are designed for children with disability, offering sensory‑friendly settings, longer time slots and personalised attention.</p>
+            </details>
+            <details>
+                <summary>Can I bring siblings to a Sensitive Santa session?</summary>
+                <p>Yes! We welcome the whole family. Please let us know ahead of time so that we can ensure a relaxed and accommodating environment.</p>
+            </details>
+            <details>
+                <summary>How do I prepare my child for the session?</summary>
+                <p>We suggest bringing any comfort items your child may need. Feel free to contact us in advance to discuss specific requirements.</p>
+            </details>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container footer-grid">
+            <div>
+                <h3>Santa by South&nbsp;Sydney&nbsp;Photography</h3>
+                <p class="small">© 2025 South Sydney Photography. All rights reserved.</p>
+            </div>
+            <div>
+                <h4>More Services</h4>
+                <ul>
+                    <li><a href="index.html">Santa Photos</a></li>
+                    <li><a href="pet-photos.html">Pet Photography</a></li>
+                    <li><a href="https://southsydneyphotography.net.au/santa/">Official Santa Site</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4>Stay Connected</h4>
+                <p>
+                    <a href="#" aria-label="Facebook"><i class="fab fa-facebook-square"></i></a>
+                    <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                    <a href="#" aria-label="Twitter"><i class="fab fa-x-twitter"></i></a>
+                </p>
+                <p class="small">A portion of every Santa photo is donated to support body image and eating disorder charities.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/santa.js?v=2"></script>
+</body>
+</html>

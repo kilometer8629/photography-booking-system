@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Your Santa Experience – Santa by South Sydney Photography</title>
+    <!-- Google font for a clean, modern look -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Main stylesheet -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="booking-page">
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">Santa&nbsp;by&nbsp;South Sydney Photography</div>
+        <button class="nav-toggle" aria-label="Toggle navigation"><i class="fas fa-bars"></i></button>
+        <ul class="nav-menu">
+            <li><a href="index.html">Santa&nbsp;Photos</a></li>
+            <li><a href="sensitive-santa.html">Sensitive&nbsp;Santa</a></li>
+            <li><a href="pet-photos.html">Santa&nbsp;Pet&nbsp;Photos</a></li>
+            <li><a href="packages.html">Packages</a></li>
+        </ul>
+        <a href="booking.html" class="btn btn-cta">Book&nbsp;Now</a>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero booking-hero" style="background-image: url('images/santa_photos_hero.png');">
+        <div class="hero-overlay">
+            <h1>Book Your Santa Experience</h1>
+            <p>Select a date and time below to secure your magical moment with Santa</p>
+            <a href="#booking-section" class="btn btn-primary">Start&nbsp;Booking</a>
+        </div>
+    </header>
+
+    <!-- Booking Section -->
+    <section id="booking-section" class="section">
+        <div class="container booking-container">
+            <div class="calendar-card">
+                <div class="calendar-card__banner">
+                    <h2 class="section-title">Visit Santa at Tramsheds</h2>
+                    <p class="calendar-card__location">
+                        Tramsheds, 1 Dalgal Way, Forest Lodge NSW 2037 &middot;
+                        <a href="https://tramshedssydney.com.au/" target="_blank" rel="noopener">View centre details</a>
+                    </p>
+                </div>
+                <div class="calendar-card__intro">
+                    <p>Please select a date for your visit from the calendar below. Once a date is chosen, pick an available time to confirm your Santa photo session.</p>
+                    <p class="calendar-card__notice">Only one family per booking. Please arrive 5 minutes prior to your session to keep Santa&rsquo;s schedule running on time.</p>
+                </div>
+                <form id="calendar-booking-form" class="calendar-form" method="POST" onsubmit="return handleBooking(event)" data-confirmation-target="#booking-confirmation" data-location="Tramsheds, 1 Dalgal Way, Forest Lodge NSW 2037">
+                    <div class="calendar-shell" data-calendar>
+                        <div class="calendar-shell__header">
+                            <button type="button" class="calendar-nav" data-calendar-prev aria-label="Previous month">
+                                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                            </button>
+                            <div>
+                                <span class="calendar-month" data-calendar-month>November</span>
+                                <span class="calendar-year" data-calendar-year>2025</span>
+                            </div>
+                            <button type="button" class="calendar-nav" data-calendar-next aria-label="Next month">
+                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="calendar-grid" role="grid" aria-labelledby="calendar-heading">
+                            <div class="calendar-grid__header" role="row">
+                                <span role="columnheader" aria-label="Sunday">Sun</span>
+                                <span role="columnheader" aria-label="Monday">Mon</span>
+                                <span role="columnheader" aria-label="Tuesday">Tue</span>
+                                <span role="columnheader" aria-label="Wednesday">Wed</span>
+                                <span role="columnheader" aria-label="Thursday">Thu</span>
+                                <span role="columnheader" aria-label="Friday">Fri</span>
+                                <span role="columnheader" aria-label="Saturday">Sat</span>
+                            </div>
+                            <div class="calendar-grid__body" data-calendar-grid role="rowgroup"></div>
+                        </div>
+                    </div>
+                    <input type="hidden" name="selectedDate" id="selected-date">
+                    <input type="hidden" name="selectedTime" id="selected-time">
+                    <input type="hidden" name="selectedPackage" id="selected-package">
+                    <div class="calendar-selection-summary" data-calendar-summary hidden>
+                        <div class="calendar-selection-summary__content">
+                            <span class="calendar-selection-summary__label">Selected session</span>
+                            <p class="calendar-selection-summary__value" data-calendar-summary-text>
+                                Please pick a date and time to continue.
+                            </p>
+                        </div>
+                        <button type="button" class="calendar-selection-summary__change" data-calendar-change>
+                            Change
+                        </button>
+                    </div>
+                    <div class="calendar-packages" data-package-container>
+                        <div class="calendar-packages__header">
+                            <h3>Choose your package</h3>
+                            <p class="calendar-packages__hint" data-package-hint>Select a package to continue.</p>
+                        </div>
+                        <div class="calendar-packages__grid" data-package-options>
+                            <button type="button" class="package-option" data-package-option data-package-id="santa-gift-pack" data-package-name="Santa's Gift Pack">
+                                <span class="package-option__media" aria-hidden="true">
+                                    <img src="images/pack-santa-gift-pack-no-card.jpg" alt="">
+                                </span>
+                                <span class="package-option__body">
+                                    <span class="package-option__name">Santa's Gift Pack</span>
+                                    <span class="package-option__desc">Deluxe prints, themed folder and keepsake ornament bundle.</span>
+                                    <span class="package-option__price" data-package-price>Loading price…</span>
+                                </span>
+                            </button>
+
+                            <button type="button" class="package-option" data-package-option data-package-id="rudolph" data-package-name="Rudolph">
+                                <span class="package-option__media" aria-hidden="true">
+                                    <img src="images/pack-rudolph.jpg" alt="">
+                                </span>
+                                <span class="package-option__body">
+                                    <span class="package-option__name">Rudolph</span>
+                                    <span class="package-option__desc">Our fan favourite mix of premium prints, wallet photos and magnets.</span>
+                                    <span class="package-option__price" data-package-price>Loading price…</span>
+                                </span>
+                            </button>
+
+                            <button type="button" class="package-option" data-package-option data-package-id="blitzen" data-package-name="Blitzen">
+                                <span class="package-option__media" aria-hidden="true">
+                                    <img src="images/pack-blitzen.jpg" alt="">
+                                </span>
+                                <span class="package-option__body">
+                                    <span class="package-option__name">Blitzen</span>
+                                    <span class="package-option__desc">Gift-ready enlargement with multiple print sizes and holiday cards.</span>
+                                    <span class="package-option__price" data-package-price>Loading price…</span>
+                                </span>
+                            </button>
+
+                            <button type="button" class="package-option" data-package-option data-package-id="digital-package" data-package-name="Digital Package">
+                                <span class="package-option__media" aria-hidden="true">
+                                    <img src="images/pack-digital-package.jpg" alt="">
+                                </span>
+                                <span class="package-option__body">
+                                    <span class="package-option__name">Digital Package</span>
+                                    <span class="package-option__desc">Instant online gallery with downloadable, share-ready files.</span>
+                                    <span class="package-option__price" data-package-price>Loading price…</span>
+                                </span>
+                            </button>
+
+                            <button type="button" class="package-option" data-package-option data-package-id="vixen" data-package-name="Vixen">
+                                <span class="package-option__media" aria-hidden="true">
+                                    <img src="images/pack-vixen.jpg" alt="">
+                                </span>
+                                <span class="package-option__body">
+                                    <span class="package-option__name">Vixen</span>
+                                    <span class="package-option__desc">Premium session featuring extra poses, retouching and hybrid keepsakes.</span>
+                                    <span class="package-option__price" data-package-price>Loading price…</span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="booking-details-card" data-booking-summary hidden>
+                        <h3>Secure Your Session</h3>
+                        <div class="booking-summary-grid">
+                            <div>
+                                <span>Date</span>
+                                <strong data-summary-date>—</strong>
+                            </div>
+                            <div>
+                                <span>Session Time</span>
+                                <strong data-summary-time>—</strong>
+                            </div>
+                            <div>
+                                <span>Package</span>
+                                <strong data-summary-package>—</strong>
+                            </div>
+                            <div>
+                                <span>Price</span>
+                                <strong data-summary-price>—</strong>
+                            </div>
+                        </div>
+                        <div class="booking-details-grid">
+                            <label>
+                                Full Name
+                                <input type="text" name="customer-name" id="customer-name" placeholder="Parent or guardian name" autocomplete="name" disabled required>
+                            </label>
+                            <label>
+                                Email
+                                <input type="email" name="customer-email" id="customer-email" placeholder="name@example.com" autocomplete="email" disabled required>
+                            </label>
+                            <label>
+                                Mobile
+                                <input type="tel" name="customer-phone" id="customer-phone" placeholder="04xx xxx xxx" autocomplete="tel" pattern="\+?[0-9 ]{8,15}" disabled required>
+                            </label>
+                        </div>
+                    </div>
+                    <p class="booking-error hidden" data-booking-error role="alert"></p>
+                    <div class="calendar-actions">
+                        <button type="submit" class="btn btn-primary" data-calendar-submit disabled>Confirm booking</button>
+                    </div>
+                </form>
+                <div class="calendar-times-modal" data-times-modal aria-hidden="true">
+                    <div class="calendar-times-modal__overlay" data-modal-close></div>
+                    <div class="calendar-times-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="calendar-heading" tabindex="-1" data-times-dialog>
+                        <button type="button" class="calendar-times-modal__close" data-modal-close aria-label="Close available times">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <div class="calendar-times">
+                            <div class="calendar-times__header">
+                                <h3 id="calendar-heading">Available times</h3>
+                                <p class="calendar-times__date hidden" data-calendar-selected-label></p>
+                                <p class="calendar-times__hint" data-calendar-hint>Select a date on the calendar to view available sessions.</p>
+                            </div>
+                            <div class="calendar-times__list" data-calendar-times role="list"></div>
+                            <div class="calendar-times__actions">
+                                <button type="button" class="btn btn-primary" data-modal-close>Done selecting times</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p id="booking-confirmation" class="confirmation-message hidden">Thank you! Your booking has been submitted. We'll send a confirmation email shortly.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Assistance Section -->
+    <section class="help-section">
+        <div class="container">
+            <p>For assistance, visit our <a href="#">Help Centre</a> or click 'Chat with us' in the bottom right corner of our website.</p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container footer-grid">
+            <div>
+                <h3>About Santa&nbsp;by&nbsp;Santa by South Sydney Photography</h3>
+                <p class="small">Delivering magical Santa experiences across Australia. Our team is dedicated to capturing the joy of the festive season through inclusive, professional photography.</p>
+            </div>
+            <div>
+                <h4>Pages</h4>
+                <ul>
+                    <li><a href="index.html">Santa Photos</a></li>
+                    <li><a href="sensitive-santa.html">Sensitive Santa</a></li>
+                    <li><a href="pet-photos.html">Santa Pet Photos</a></li>
+                    <li><a href="booking.html" class="active">Book Now</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4>Contact</h4>
+                <ul>
+                    <li>Email: info@southsydney.net.au</li>
+                    <li>Phone: +61 2 9558 3363</li>
+                    <li>Locations: Sydney Australia</li>
+                </ul>
+            </div>
+        </div>
+        <p class="small text-center">&copy; <span id="year"></span> Santa by South Sydney Photography pty ltd. All rights reserved.</p>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        console.log('📄 booking.html loaded, checking for handleBooking...');
+        // Check if handleBooking exists before it's needed
+        if (typeof window.handleBooking === 'function') {
+            console.log('✅ handleBooking is a function');
+        } else {
+            console.warn('⚠️ handleBooking not yet a real function, will be set by santa.js');
+        }
+    </script>
+    <script src="js/santa.js?v=5"></script>
+    <script>
+        console.log('📄 santa.js loaded, checking again...');
+        if (typeof window.handleBooking === 'function') {
+            console.log('✅ handleBooking is now a function!');
+        } else {
+            console.error('❌ handleBooking is STILL not a real function after santa.js!');
+        }
+        
+        // Update copyright year
+        document.getElementById('year').textContent = new Date().getFullYear();
+    </script>
+</body>
+</html>
