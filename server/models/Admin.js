@@ -75,8 +75,6 @@ const AdminSchema = new mongoose.Schema({
 });
 
 // Indexes
-AdminSchema.index({ username: 1 });
-AdminSchema.index({ email: 1 });
 AdminSchema.index({ isActive: 1 });
 
 // Virtual for full name

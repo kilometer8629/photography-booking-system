@@ -27,6 +27,22 @@ const { Booking, Message, Admin } = require('./models');
 
 const app = express();
 
+// Ensure Express knows how to trust upstream proxies (required on Vercel for accurate IPs/rate limiting)
+const resolveTrustProxyValue = (value) => {
+  if (value === undefined) return undefined;
+  if (value === 'false') return false;
+  if (value === 'true') return true;
+  const numeric = Number(value);
+  return Number.isNaN(numeric) ? value : numeric;
+};
+
+const explicitTrustProxy = resolveTrustProxyValue(process.env.TRUST_PROXY);
+if (explicitTrustProxy !== undefined) {
+  app.set('trust proxy', explicitTrustProxy);
+} else if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); // Trust first proxy (Vercel/most managed hosts)
+}
+
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
@@ -376,20 +392,36 @@ app.use(express.static(path.join(__dirname, '../public'), {
 }));
 
 // ===== Session Configuration =====
-const sessionStore = MongoStore.create({
-  mongoUrl: process.env.MONGODB_URI,
-  collectionName: 'sessions',
-  ttl: 24 * 60 * 60,
-  autoRemove: 'interval',
-  autoRemoveInterval: 60,
-  crypto: {
-    secret: process.env.SESSION_SECRET.substring(0, 32)
+const sessionSecret = process.env.SESSION_SECRET || uuidv4();
+if (!process.env.SESSION_SECRET) {
+  console.warn('SESSION_SECRET is not set. Using an ephemeral secret; sessions will reset on each deploy.');
+}
+
+let sessionStore;
+const mongoUri = process.env.MONGODB_URI;
+
+if (mongoUri) {
+  const mongoStoreConfig = {
+    mongoUrl: mongoUri,
+    collectionName: 'sessions',
+    ttl: 24 * 60 * 60,
+    autoRemove: 'interval',
+    autoRemoveInterval: 60
+  };
+
+  if (sessionSecret) {
+    mongoStoreConfig.crypto = { secret: sessionSecret.substring(0, 32) };
   }
-});
+
+  sessionStore = MongoStore.create(mongoStoreConfig);
+} else {
+  console.warn('MONGODB_URI is not configured. Falling back to MemoryStore for sessions.');
+  sessionStore = new session.MemoryStore();
+}
 
 app.use(session({
   name: process.env.SESSION_NAME,
-  secret: process.env.SESSION_SECRET,
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   store: sessionStore,
@@ -897,7 +929,8 @@ const noCache = (req, res, next) => {
 };
 
 // ===== Database Connection =====
-mongoose.connect(process.env.MONGODB_URI, {
+if (mongoUri) {
+  mongoose.connect(mongoUri, {
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
     maxPoolSize: 50,
@@ -914,7 +947,10 @@ mongoose.connect(process.env.MONGODB_URI, {
   
   mongoose.connection.on('error', err => {
     console.error('MongoDB runtime error:', err);
-});
+  });
+} else {
+  console.warn('MONGODB_URI is not set. Skipping MongoDB connection; database-backed features are disabled.');
+}
 
 // ===== Authentication Middleware =====
 const authenticate = (req, res, next) => {
