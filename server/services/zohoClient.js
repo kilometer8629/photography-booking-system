@@ -188,7 +188,11 @@ async function fetchFreeBusy(rangeStart, rangeEnd) {
     throw new Error('Zoho free/busy user email is not configured.');
   }
 
-  console.log(`[Zoho] Fetching free/busy data for ${freeBusyUser} from ${rangeStart.toISO()} to ${rangeEnd.toISO()}`);
+  // Mask email for logging (show first 3 chars and domain only)
+  const maskedEmail = freeBusyUser ? 
+    freeBusyUser.substring(0, 3) + '***@' + freeBusyUser.split('@')[1] : 
+    'not-configured';
+  console.log(`[Zoho] Fetching free/busy data for ${maskedEmail} from ${rangeStart.toISO()} to ${rangeEnd.toISO()}`);
   const token = await getAccessToken();
 
   const url = new URL('/api/v1/calendars/freebusy', calendarBaseUrl);
