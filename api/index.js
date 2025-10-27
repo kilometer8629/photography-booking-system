@@ -240,6 +240,21 @@ const csrfTokenOnly = csrf({
   value: () => ''
 });
 
+// CSRF token endpoints (placed before rate limiting so they're always accessible)
+app.get('/api/csrf-token', csrfTokenOnly, (req, res) => {
+  res.json({
+    token: req.csrfToken(),
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+  });
+});
+
+app.get('/csrf-token', csrfProtection, (req, res) => {
+  res.json({
+    token: req.csrfToken(),
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+  });
+});
+
 // Rate limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -340,20 +355,7 @@ const getTaxReceiptEmailTemplate = (booking) => {
 
 // ===== Public Routes =====
 
-// CSRF Token endpoint
-app.get('/api/csrf-token', csrfTokenOnly, (req, res) => {
-  res.json({ 
-    token: req.csrfToken(),
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
-  });
-});
-
-app.get('/csrf-token', csrfProtection, (req, res) => {
-  res.json({ 
-    token: req.csrfToken(),
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
-  });
-});
+// (CSRF token endpoints are defined earlier to ensure availability before rate limiting)
 
 // Stripe Webhook
 app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -560,8 +562,8 @@ app.get('/api/availability', async (req, res) => {
     const { date, start, end } = req.query || {};
     console.log('[API] /api/availability endpoint called', { date, start, end, timestamp: new Date().toISOString() });
 
-    // Fetch booked slots from database (confirmed or pending)
-    console.log('[API] Fetching booked slots from database...');
+  // Fetch booked slots from database (confirmed or pending)
+  // (This log is intentionally omitted to reduce noise)
     const bookedSlots = await Booking.find({
       status: { $in: ['confirmed', 'pending'] }
     }).select('eventDate startTime').lean();
@@ -656,7 +658,7 @@ app.get('/api/availability', async (req, res) => {
       console.error('Availability fallback error:', fallbackError);
     }
 
-    res.status(500).json({ error: 'Unable to load availability. Please try again.' });
+    return res.status(500).json({ error: 'Unable to load availability. Please try again.' });
   }
 });
 
@@ -670,12 +672,14 @@ app.get('/api/packages', async (req, res) => {
         description: pkg.description,
         available: Boolean(pkg.priceId && stripe),
         formattedPrice: priceInfo?.formatted || null,
-        currency: priceInfo?.currency || null
+        currency: priceInfo?.currency || null,
+        amount: priceInfo?.amount || null
       };
     }));
-    res.json({ packages });
+    res.json({ packages, slotMinutes: zohoSettings.slotMinutes });
   } catch (error) {
-    res.status(500).json({ error: 'Unable to load packages' });
+    console.error('Package catalogue error:', error);
+    res.status(500).json({ error: 'Unable to load packages at this time.' });
   }
 });
 
@@ -789,7 +793,7 @@ app.get('/api/customer/booking', async (req, res) => {
 const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
   const eventDate = DateTime.fromJSDate(new Date(booking.eventDate), { zone: 'Australia/Sydney' });
   const requestedDate = DateTime.fromISO(newDate, { zone: 'Australia/Sydney' });
-  
+
   return {
     subject: 'Reschedule Request Received - Ami Photography',
     html: `
@@ -848,7 +852,7 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
 const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
   const amount = (booking.packageAmount / 100 || 0).toFixed(2);
   const refund = (refundAmount / 100).toFixed(2);
-  
+
   return {
     subject: 'Booking Cancellation Confirmation - Ami Photography',
     html: `
@@ -1037,7 +1041,7 @@ app.post('/api/customer/cancel', async (req, res) => {
 // Contact form email template
 const getContactEmailTemplate = (name, formData) => {
   const submittedAt = DateTime.now().setZone('Australia/Sydney').toFormat('MMMM d, yyyy');
-  
+
   return {
     subject: 'Thank you for contacting Ami Photography!',
     html: `
@@ -1094,7 +1098,7 @@ app.post('/api/submit-contact', csrfProtection, async (req, res) => {
       subject: subject || 'General Inquiry',
       message: message
     });
-    
+
     const emailResult = await sendConfirmationEmail(email, emailTemplate);
 
     res.status(201).json({
@@ -1112,6 +1116,38 @@ app.post('/api/submit-contact', csrfProtection, async (req, res) => {
       csrfToken: req.csrfToken()
     });
   }
+
+  // Handle unknown API routes
+  app.use('/api', (req, res) => {
+    res.status(404).json({ error: 'Endpoint not found' });
+  });
+
+  // Centralized error handling
+  app.use((err, req, res, next) => {
+    console.error('Error:', {
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+      url: req.originalUrl,
+      method: req.method,
+      status: err.status || 500
+    });
+
+    if (err.code === 'EBADCSRFTOKEN') {
+      try {
+        return res.status(403).json({
+          error: 'Invalid CSRF token',
+          csrfToken: req.csrfToken()
+        });
+      } catch (tokenError) {
+        console.error('Failed to generate replacement CSRF token:', tokenError);
+        return res.status(403).json({ error: 'Invalid CSRF token' });
+      }
+    }
+
+    res.status(err.status || 500).json({
+      error: err.message || 'Internal server error'
+    });
+  });
 });
 
 // Serve static files from public directory
