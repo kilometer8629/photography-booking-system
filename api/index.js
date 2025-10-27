@@ -735,9 +735,9 @@ app.get('/api/customer/booking', async (req, res) => {
       return res.status(400).json({ error: 'Email address required' });
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Validate email format - simple regex to prevent ReDoS
+    // Basic validation: has @ and . after @, reasonable length
+    if (email.length > 254 || !email.includes('@') || email.indexOf('.', email.indexOf('@')) === -1) {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
