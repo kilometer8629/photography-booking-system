@@ -21,6 +21,9 @@
   ],
   "author": "Your Name",
   "license": "ISC",
+  "engines": {
+    "node": ">=22.21.0"
+  },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "connect-mongo": "^5.1.0",
