@@ -562,8 +562,8 @@ app.get('/api/availability', async (req, res) => {
     const { date, start, end } = req.query || {};
     console.log('[API] /api/availability endpoint called', { date, start, end, timestamp: new Date().toISOString() });
 
-  // Fetch booked slots from database (confirmed or pending)
-  // (This log is intentionally omitted to reduce noise)
+    // Fetch booked slots from database (confirmed or pending)
+    // (This log is intentionally omitted to reduce noise)
     const bookedSlots = await Booking.find({
       status: { $in: ['confirmed', 'pending'] }
     }).select('eventDate startTime').lean();
