@@ -978,6 +978,84 @@ app.post('/api/customer/cancel', async (req, res) => {
   }
 });
 
+// Contact form email template
+const getContactEmailTemplate = (name, formData) => {
+  return {
+    subject: 'Thank you for contacting Ami Photography!',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Hi ${name},</h2>
+        <p>Thank you for reaching out to Ami Photography! We've received your inquiry and are excited to potentially work with you.</p>
+        
+        <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
+          <h3>Your Message Details:</h3>
+          <p><strong>Subject:</strong> ${formData.subject}</p>
+          <p><strong>Message:</strong> ${formData.message}</p>
+          <p><strong>Submitted:</strong> ${new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <p>We'll get back to you within 24-48 hours with a detailed response.</p>
+        <p>In the meantime, feel free to browse our portfolio or check out our photography packages on our website.</p>
+        
+        <p>Best regards,<br>
+        <strong>The Ami Photography Team</strong><br>
+        📞 (123) 456-7890<br>
+        ✉️ info@amiphotography.com</p>
+      </div>
+    `
+  };
+};
+
+// POST: Contact form submission
+app.post('/api/submit-contact', csrfProtection, async (req, res) => {
+  try {
+    const { name, email, phone, subject, message } = req.body;
+
+    if (!name || !email || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields (name, email, message)',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    const newMessage = new Message({
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone ? phone.trim() : '',
+      subject: subject || 'General Inquiry',
+      message: message.trim(),
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    const savedMessage = await newMessage.save();
+
+    // Send confirmation email
+    const emailTemplate = getContactEmailTemplate(name, {
+      subject: subject || 'General Inquiry',
+      message: message
+    });
+    
+    const emailResult = await sendConfirmationEmail(email, emailTemplate);
+
+    res.status(201).json({
+      success: true,
+      message: 'Message sent successfully!',
+      messageId: savedMessage._id,
+      emailSent: emailResult.success,
+      csrfToken: req.csrfToken()
+    });
+  } catch (error) {
+    console.error('Contact form error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send message',
+      csrfToken: req.csrfToken()
+    });
+  }
+});
+
 // Serve static files from public directory
 const publicPath = path.join(__dirname, '../public');
 app.use(express.static(publicPath));
