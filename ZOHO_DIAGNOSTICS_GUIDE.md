@@ -17,7 +17,7 @@ This will return a JSON response showing:
 - API operational status
 - Test results with sample availability data
 
-Example response:
+Example response (public access):
 ```json
 {
   "timestamp": "2025-10-27T14:00:00.000Z",
@@ -28,7 +28,7 @@ Example response:
     "accounts_base_url": "https://accounts.zoho.com.au",
     "calendar_base_url": "https://calendar.zoho.com.au",
     "calendar_id": "primary",
-    "freebusy_user": "user@example.com",
+    "freebusy_user": "Configured",
     "timezone": "Australia/Sydney",
     "slot_minutes": "5",
     "operating_hours": "10:00 - 16:00"
@@ -37,11 +37,12 @@ Example response:
   "message": "Zoho API is working correctly",
   "test_result": {
     "test_date": "2025-10-27",
-    "available_slots": 72,
-    "sample_slots": ["10:00", "10:05", "10:10"]
+    "available_slots_count": 72
   }
 }
 ```
+
+**Note:** Sample slot times are only included when accessed by authenticated admin users for security reasons.
 
 ### 2. View Vercel Logs
 
