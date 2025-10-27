@@ -321,6 +321,21 @@ const getTaxReceiptEmailTemplate = (booking) => {
 
 // ===== Public Routes =====
 
+// CSRF Token endpoint
+app.get('/api/csrf-token', csrfTokenOnly, (req, res) => {
+  res.json({ 
+    token: req.csrfToken(),
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+  });
+});
+
+app.get('/csrf-token', csrfProtection, (req, res) => {
+  res.json({ 
+    token: req.csrfToken(),
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+  });
+});
+
 // Stripe Webhook
 app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
@@ -391,8 +406,134 @@ app.post('/api/create-checkout-session', csrfProtection, async (req, res) => {
   if (!stripe) {
     return res.status(503).json({ error: 'Stripe payment processing is not configured.' });
   }
-  // ... (keep existing implementation)
-  res.json({ url: 'https://checkout.stripe.com/placeholder' });
+
+  const {
+    selectedDate,
+    selectedTime,
+    packageId,
+    location,
+    packageName,
+    customerName,
+    customerEmail,
+    customerPhone,
+    packagePrice,
+    packageAmount,
+    packageCurrency
+  } = req.body || {};
+
+  if (!selectedDate || !selectedTime || !packageId || !location) {
+    return res.status(400).json({ error: 'Missing booking details for checkout.' });
+  }
+
+  if (!customerName || !customerEmail || !customerPhone) {
+    return res.status(400).json({ error: 'Please provide your contact details before continuing.' });
+  }
+
+  const packageMeta = packageMap[packageId];
+
+  if (!packageMeta || !packageMeta.priceId) {
+    return res.status(400).json({ error: 'Selected package is unavailable.' });
+  }
+
+  let priceInfo = null;
+  let zohoEventRecord = null;
+  let bookingDocument = null;
+
+  try {
+    const availableSlots = await getAvailabilityForDate(selectedDate);
+    if (!availableSlots.includes(selectedTime)) {
+      return res.status(409).json({ error: 'That session time has just been booked. Please choose another slot.' });
+    }
+
+    zohoEventRecord = await createZohoEvent({
+      date: selectedDate,
+      time: selectedTime,
+      durationMinutes: zohoSettings.slotMinutes,
+      summary: `${packageName || packageMeta.name} - Santa Session`,
+      description: 'Generated from the online Santa photo booking portal.',
+      location
+    });
+
+    priceInfo = await getPackagePriceInfo(packageMeta);
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: packageMeta.priceId,
+          quantity: 1
+        }
+      ],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      customer_email: customerEmail,
+      phone_number_collection: {
+        enabled: true
+      },
+      metadata: {
+        location,
+        selectedDate,
+        selectedTime,
+        packageId: packageMeta.id,
+        packageName: packageName || packageMeta.name,
+        zohoEventId: zohoEventRecord.id,
+        customerName,
+        customerEmail,
+        customerPhone,
+        packagePrice: packagePrice || priceInfo?.formatted || '',
+        packageCurrency: packageCurrency || priceInfo?.currency || '',
+        packageAmount: (packageAmount ?? priceInfo?.amount)?.toString() || ''
+      }
+    });
+
+    const startDateTime = DateTime.fromISO(`${selectedDate}T${selectedTime}`, {
+      zone: zohoSettings.calendarTimezone || 'Australia/Sydney'
+    });
+    const endDateTime = startDateTime.plus({ minutes: zohoSettings.slotMinutes });
+
+    bookingDocument = await Booking.create({
+      eventType: 'Santa Session',
+      eventDate: startDateTime.toJSDate(),
+      startTime: startDateTime.toFormat('HH:mm'),
+      endTime: endDateTime.toFormat('HH:mm'),
+      location,
+      package: packageName || packageMeta.name,
+      status: 'pending',
+      additionalNotes: 'Awaiting Stripe payment confirmation via Stripe Checkout.',
+      depositPaid: false,
+      depositAmount: 0,
+      zohoEventId: zohoEventRecord.id,
+      stripeSessionId: session.id,
+      packageId: packageMeta.id,
+      clientName: customerName,
+      clientEmail: customerEmail,
+      clientPhone: customerPhone,
+      packagePrice: packagePrice || priceInfo?.formatted || '',
+      packageCurrency: packageCurrency || priceInfo?.currency || '',
+      packageAmount: (packageAmount ?? priceInfo?.amount) || undefined,
+      estimatedCost: priceInfo?.amount ? priceInfo.amount / 100 : undefined
+    });
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error('Stripe checkout error:', error);
+    if (bookingDocument?._id) {
+      try {
+        await Booking.deleteOne({ _id: bookingDocument._id });
+      } catch (cleanupError) {
+        console.error('Failed to remove pending booking after error:', cleanupError);
+      }
+    }
+    if (zohoEventRecord?.id) {
+      try {
+        await deleteZohoEvent(zohoEventRecord.id);
+      } catch (cleanupError) {
+        console.error('Failed to remove Zoho event after error:', cleanupError);
+      }
+    }
+    res.status(500).json({ error: 'Unable to start payment. Please try again.' });
+  }
 });
 
 app.get('/api/availability', async (req, res) => {
@@ -516,6 +657,324 @@ app.get('/api/packages', async (req, res) => {
     res.json({ packages });
   } catch (error) {
     res.status(500).json({ error: 'Unable to load packages' });
+  }
+});
+
+// ===== Customer Booking Management Endpoints =====
+
+app.get('/api/booking-confirmation', async (req, res) => {
+  try {
+    const { session_id } = req.query;
+
+    if (!session_id) {
+      return res.status(400).json({ success: false, error: 'Session ID required' });
+    }
+
+    // Find booking by Stripe session ID
+    const booking = await Booking.findOne({ stripeSessionId: session_id });
+
+    if (!booking) {
+      return res.status(404).json({ success: false, error: 'Booking not found' });
+    }
+
+    // Return sanitized booking details for display
+    res.json({
+      success: true,
+      booking: {
+        _id: booking._id,
+        eventDate: booking.eventDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        location: booking.location,
+        package: booking.package,
+        clientName: booking.clientName,
+        clientEmail: booking.clientEmail,
+        packageAmount: booking.packageAmount,
+        packageCurrency: booking.packageCurrency,
+        estimatedCost: booking.estimatedCost,
+        status: booking.status,
+        depositPaid: booking.depositPaid
+      }
+    });
+  } catch (error) {
+    console.error('Booking confirmation error:', error);
+    res.status(500).json({ success: false, error: 'Unable to retrieve booking details' });
+  }
+});
+
+// GET: Fetch customer's booking by email
+app.get('/api/customer/booking', async (req, res) => {
+  try {
+    const { email, bookingId } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email address required' });
+    }
+
+    // Find by booking ID first if provided, otherwise find by email
+    let query = bookingId ? { _id: bookingId } : { clientEmail: email };
+    const booking = await Booking.findOne(query);
+
+    if (!booking) {
+      return res.status(404).json({ error: 'No booking found with that email address' });
+    }
+
+    // If searching by ID, verify it matches the email
+    if (bookingId && booking.clientEmail.toLowerCase() !== email.toLowerCase()) {
+      return res.status(403).json({ error: 'Email does not match this booking' });
+    }
+
+    res.json({
+      success: true,
+      booking: {
+        _id: booking._id,
+        eventDate: booking.eventDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        location: booking.location,
+        package: booking.package,
+        clientName: booking.clientName,
+        clientEmail: booking.clientEmail,
+        clientPhone: booking.clientPhone,
+        packageAmount: booking.packageAmount,
+        packageCurrency: booking.packageCurrency,
+        estimatedCost: booking.estimatedCost,
+        status: booking.status,
+        depositPaid: booking.depositPaid,
+        stripePaidAt: booking.stripePaidAt
+      }
+    });
+  } catch (error) {
+    console.error('Customer booking lookup error:', error);
+    res.status(500).json({ error: 'Unable to retrieve booking' });
+  }
+});
+
+// Email template functions
+const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
+  const eventDate = new Date(booking.eventDate);
+  
+  return {
+    subject: 'Reschedule Request Received - Ami Photography',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">Reschedule Request Received</h1>
+          <p style="margin: 0; opacity: 0.9;">We're working on your new date</p>
+        </div>
+        
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
+          
+          <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
+          
+          <p style="color: #555; line-height: 1.6;">
+            Thank you for submitting your reschedule request. We've received your request and will confirm your new date within 24 hours.
+          </p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #e0e0e0;">
+            <h3 style="color: #667eea; margin-top: 0;">Current Booking Details</h3>
+            <p style="margin: 10px 0; color: #555;">
+              <strong>Current Date:</strong> ${eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
+              <strong>Current Time:</strong> ${booking.startTime}<br>
+              <strong>Location:</strong> ${booking.location}<br>
+              <strong>Package:</strong> ${booking.package}
+            </p>
+            
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+            
+            <h3 style="color: #667eea; margin-top: 0;">Your Requested New Date</h3>
+            <p style="margin: 10px 0; color: #555;">
+              <strong>Requested Date:</strong> ${new Date(newDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
+              <strong>Requested Time:</strong> ${newTime}
+            </p>
+            
+            ${reason ? `<p style="margin: 15px 0; color: #666;"><strong>Reason:</strong> ${reason}</p>` : ''}
+          </div>
+          
+          <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; color: #2e7d32; font-size: 14px;">
+              <strong>✓ What's Next?</strong> We'll confirm availability for your new date and send you a confirmation email within 24 hours. Your package and price remain the same.
+            </p>
+          </div>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; text-align: center;">
+            <p style="margin: 5px 0;">If you need to change your request or have questions, please contact us:<br>
+            📞 (123) 456-7890 • ✉️ info@amiphotography.com<br>
+            <br>
+            Thank you for your patience!</p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+};
+
+const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
+  const amount = (booking.packageAmount / 100 || 0).toFixed(2);
+  const refund = (refundAmount / 100).toFixed(2);
+  
+  return {
+    subject: 'Booking Cancellation Confirmation - Ami Photography',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">Booking Cancelled</h1>
+          <p style="margin: 0; opacity: 0.9;">Cancellation Confirmation</p>
+        </div>
+        
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
+          
+          <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
+          
+          <p style="color: #555; line-height: 1.6;">
+            Your photography booking has been successfully cancelled. We're sorry to see you go, but we understand things come up. 
+            Below are your cancellation details and refund information.
+          </p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #e0e0e0;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 12px 0; color: #666;"><strong>Original Amount Paid:</strong></td>
+                <td style="text-align: right; padding: 12px 0; color: #333; font-weight: 600;">${booking.packageCurrency || '$'}${amount}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 12px 0; color: #666;"><strong>Cancellation Reason:</strong></td>
+                <td style="text-align: right; padding: 12px 0; color: #333;">${refundReason}</td>
+              </tr>
+              <tr>
+                <td style="padding: 15px 0; color: #667eea; font-size: 16px;"><strong>Refund Amount:</strong></td>
+                <td style="text-align: right; padding: 15px 0; background-color: #e8f5e9; border-radius: 4px; padding-right: 10px; font-weight: 700; color: #2e7d32; font-size: 18px;">
+                  ${booking.packageCurrency || '$'}${refund}
+                </td>
+              </tr>
+            </table>
+          </div>
+          
+          <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; color: #1565c0; font-size: 14px;">
+              <strong>✓ Refund Processing:</strong> Your refund of ${booking.packageCurrency || '$'}${refund} will be processed to your original payment method within 5-7 business days.
+            </p>
+          </div>
+          
+          <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; color: #856404; font-size: 14px;">
+              <strong>Want to reschedule instead?</strong> Visit our booking management page to reschedule for another date.
+            </p>
+          </div>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; text-align: center;">
+            <p style="margin: 5px 0;">If you have any questions about your cancellation or refund, please contact us:<br>
+            📞 (123) 456-7890 • ✉️ info@amiphotography.com<br>
+            <br>
+            We hope to work with you again in the future!</p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+};
+
+// POST: Reschedule booking
+app.post('/api/customer/reschedule', async (req, res) => {
+  try {
+    const { bookingId, newDate, newTime, reason } = req.body;
+
+    if (!bookingId || !newDate || !newTime) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ error: 'Cannot reschedule a cancelled booking' });
+    }
+
+    const eventDate = new Date(booking.eventDate);
+    if (eventDate < new Date()) {
+      return res.status(400).json({ error: 'Cannot reschedule past events' });
+    }
+
+    // Update booking with reschedule request
+    booking.additionalNotes = `Reschedule request submitted:\nRequested date: ${newDate} at ${newTime}\nReason: ${reason || 'Not provided'}\nOriginal date: ${booking.eventDate}`;
+    booking.status = 'pending_reschedule';
+    await booking.save();
+
+    // Send reschedule confirmation email
+    const rescheduleTemplate = getRescheduleEmailTemplate(booking, newDate, newTime, reason);
+    await sendConfirmationEmail(booking.clientEmail, rescheduleTemplate);
+
+    console.log(`✅ Reschedule request submitted for booking ${bookingId}`);
+
+    res.json({ success: true, message: 'Reschedule request submitted. You\'ll receive confirmation within 24 hours.' });
+  } catch (error) {
+    console.error('Reschedule error:', error);
+    res.status(500).json({ error: 'Unable to process reschedule request' });
+  }
+});
+
+// POST: Cancel booking
+app.post('/api/customer/cancel', async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+
+    if (!bookingId) {
+      return res.status(400).json({ error: 'Booking ID required' });
+    }
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ error: 'Booking is already cancelled' });
+    }
+
+    // Calculate refund based on cancellation policy
+    const eventDate = new Date(booking.eventDate);
+    const daysUntilEvent = Math.ceil((eventDate - new Date()) / (1000 * 60 * 60 * 24));
+    let refundPercentage = 0;
+    let refundReason = '';
+
+    if (daysUntilEvent < 0) {
+      refundPercentage = 0;
+      refundReason = 'Event already passed - no refund';
+    } else if (daysUntilEvent >= 21) {
+      refundPercentage = 90; // Full minus 10% admin fee
+      refundReason = '21+ days before event - Full refund (minus 10% admin fee)';
+    } else if (daysUntilEvent >= 8) {
+      refundPercentage = 50;
+      refundReason = '8-20 days before event - 50% refund';
+    } else {
+      refundPercentage = 0;
+      refundReason = 'Less than 7 days before event - Non-refundable per policy';
+    }
+
+    const refundAmount = Math.round((booking.packageAmount || 0) * refundPercentage / 100);
+
+    // Update booking
+    booking.status = 'cancelled';
+    booking.additionalNotes = `Booking cancelled by customer. ${refundReason}. Refund amount: ${booking.packageCurrency || '$'}${(refundAmount / 100).toFixed(2)}`;
+    await booking.save();
+
+    // Send cancellation confirmation email
+    const cancellationTemplate = getCancellationEmailTemplate(booking, refundAmount, refundReason);
+    await sendConfirmationEmail(booking.clientEmail, cancellationTemplate);
+
+    console.log(`✅ Booking ${bookingId} cancelled by customer. Refund: $${(refundAmount / 100).toFixed(2)}`);
+
+    res.json({
+      success: true,
+      message: 'Booking cancelled successfully',
+      refundAmount: refundAmount,
+      refundReason: refundReason
+    });
+  } catch (error) {
+    console.error('Cancellation error:', error);
+    res.status(500).json({ error: 'Unable to cancel booking' });
   }
 });
 
