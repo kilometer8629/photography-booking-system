@@ -253,6 +253,12 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('📦 Response data:', data);
 
       if (!response.ok) {
+        if (data && data.csrfToken) {
+          bookingState.csrfToken = data.csrfToken;
+        } else if (response.status === 403) {
+          bookingState.csrfToken = null;
+        }
+
         throw new Error(data.error || 'We were unable to start the checkout. Please try again.');
       }
 

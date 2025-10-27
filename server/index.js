@@ -11,6 +11,7 @@ const morgan = require('morgan');
 const csrf = require('csurf');
 const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
+const cookieParser = require('cookie-parser');
 const { DateTime } = require('luxon');
 const {
   getAvailabilityForDate,
@@ -170,7 +171,7 @@ const initializeDatabase = async () => {
     // Create sample data if collections are empty (for development)
     const bookingCount = await Booking.countDocuments();
     const messageCount = await Message.countDocuments();
-    
+
     if (bookingCount === 0) {
       const sampleBookings = [
         {
@@ -262,8 +263,8 @@ app.use(morgan('dev'));
 
 // ===== CORS Configuration =====
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.CLIENT_URL 
+  origin: process.env.NODE_ENV === 'production'
+    ? process.env.CLIENT_URL
     : 'http://localhost:3000',
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -304,7 +305,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
       try {
         // Find booking by Stripe session ID
         const booking = await Booking.findOne({ stripeSessionId: session.id });
-        
+
         if (!booking) {
           console.warn(`⚠️ No booking found for Stripe session: ${session.id}`);
           return res.status(200).json({ received: true }); // Still return 200 to Stripe
@@ -316,7 +317,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
         booking.stripePaymentIntentId = session.payment_intent;
         booking.stripePaidAt = new Date();
         booking.additionalNotes = `Payment confirmed via Stripe on ${new Date().toISOString()}`;
-        
+
         const savedBooking = await booking.save();
         console.log(`✅ Booking ${booking._id} confirmed with payment`);
         console.log(`✅ Payment Intent ID saved: ${session.payment_intent}`);
@@ -351,8 +352,8 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
 
       try {
         // Find booking by Stripe session and update status
-        const booking = await Booking.findOne({ 
-          stripePaymentIntentId: charge.payment_intent 
+        const booking = await Booking.findOne({
+          stripePaymentIntentId: charge.payment_intent
         });
 
         if (booking) {
@@ -398,6 +399,8 @@ if (!process.env.SESSION_SECRET) {
   console.warn('SESSION_SECRET is not set. Using an ephemeral secret; sessions will reset on each deploy.');
 }
 
+app.use(cookieParser(process.env.COOKIE_SECRET || sessionSecret));
+
 let sessionStore;
 const mongoUri = process.env.MONGODB_URI;
 
@@ -437,33 +440,38 @@ app.use(session({
 }));
 
 // ===== CSRF Middleware Configuration =====
+const csrfCookieOptions = {
+  key: process.env.CSRF_COOKIE_NAME || 'ss.csrf',
+  httpOnly: true,
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  maxAge: 24 * 60 * 60 * 1000
+};
+
 const csrfProtection = csrf({
-    cookie: false, // We're using sessions
-    value: (req) => {
-      // Check both headers and body for CSRF token
-      return req.headers['x-csrf-token'] || req.body._csrf;
-    }
+  cookie: csrfCookieOptions,
+  value: (req) => req.headers['x-csrf-token'] || req.body._csrf
 });
 
 // Middleware to generate CSRF token without validation
 const csrfTokenOnly = csrf({
-    cookie: false,
-    value: () => '' // Don't validate any incoming tokens
+  cookie: csrfCookieOptions,
+  value: () => ''
 });
 
 // CSRF token endpoints - MUST be before CSRF protection is applied
 app.get('/api/csrf-token', csrfTokenOnly, (req, res) => {
-    res.json({ 
-        token: req.csrfToken(),
-        expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
-    });
+  res.json({
+    token: req.csrfToken(),
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+  });
 });
 
 app.get('/csrf-token', csrfProtection, (req, res) => {
-    res.json({ 
-        token: req.csrfToken(),
-        expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
-    });
+  res.json({
+    token: req.csrfToken(),
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
+  });
 });
 
 // ===== Rate Limiting =====
@@ -949,15 +957,15 @@ if (mongoUri) {
     maxPoolSize: 50,
     wtimeoutMS: 2500
   })
-  .then(async () => {
-    console.log('✅ MongoDB connected successfully');
-    await initializeDatabase();
-  })
-  .catch(err => {
-    console.error('❌ MongoDB connection error:', err);
-    console.log('⚠️ Server will continue running without database connection');
-  });
-  
+    .then(async () => {
+      console.log('✅ MongoDB connected successfully');
+      await initializeDatabase();
+    })
+    .catch(err => {
+      console.error('❌ MongoDB connection error:', err);
+      console.log('⚠️ Server will continue running without database connection');
+    });
+
   mongoose.connection.on('error', err => {
     console.error('MongoDB runtime error:', err);
   });
@@ -968,7 +976,7 @@ if (mongoUri) {
 // ===== Authentication Middleware =====
 const authenticate = (req, res, next) => {
   if (!req.session.admin) {
-    return res.status(401).json({ 
+    return res.status(401).json({
       error: 'Authentication required',
       authenticated: false
     });
@@ -1010,24 +1018,24 @@ app.get('/api/admin/csrf-token', csrfTokenOnly, (req, res) => {
     console.log('🔐 [CSRF] Generating CSRF token for admin');
     const token = req.csrfToken();
     console.log('✅ [CSRF] Token generated:', token.substring(0, 20) + '...');
-    res.json({ 
+    res.json({
       token: token,
       success: true,
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000)
     });
   } catch (error) {
     console.error('❌ [CSRF] Token generation error:', error.message);
-    res.status(500).json({ 
-      error: 'Failed to generate CSRF token', 
+    res.status(500).json({
+      error: 'Failed to generate CSRF token',
       success: false,
-      details: error.message 
+      details: error.message
     });
   }
 });
 
 app.get('/api/admin/check-auth', noCache, (req, res) => {
   try {
-    res.json({ 
+    res.json({
       authenticated: !!req.session.admin,
       username: req.session.admin ? process.env.ADMIN_USERNAME : null,
       csrfValid: true
@@ -1043,7 +1051,7 @@ app.post('/api/admin/login', noCache, async (req, res) => {
   try {
     // Find admin user
     const admin = await Admin.findOne({ username });
-    
+
     if (!admin) {
       return res.status(401).json({
         error: 'Invalid credentials',
@@ -1069,11 +1077,11 @@ app.post('/api/admin/login', noCache, async (req, res) => {
 
     // Compare password
     const isValidPassword = await admin.comparePassword(password);
-    
+
     if (isValidPassword) {
       // Reset login attempts on successful login
       await admin.resetLoginAttempts();
-      
+
       req.session.regenerate((err) => {
         if (err) return res.status(500).json({ error: 'Session error' });
 
@@ -1084,7 +1092,7 @@ app.post('/api/admin/login', noCache, async (req, res) => {
           permissions: admin.permissions
         };
         req.session.cookie.expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        
+
         res.json({
           success: true,
           expires: req.session.cookie.expires,
@@ -1098,7 +1106,7 @@ app.post('/api/admin/login', noCache, async (req, res) => {
     } else {
       // Increment login attempts
       await admin.incLoginAttempts();
-      
+
       res.status(401).json({
         error: 'Invalid credentials',
         authenticated: false
@@ -1120,21 +1128,21 @@ app.use('/api/admin', authenticate, noCache);
 app.get('/api/admin/bookings', async (req, res) => {
   try {
     const filter = {};
-    
+
     if (req.query.status) {
       filter.status = req.query.status.toLowerCase();
     }
-    
+
     const bookings = await Booking.find(filter)
       .sort({ eventDate: -1 })
       .lean();
-    
+
     // Transform _id to id for frontend compatibility
     const transformedBookings = bookings.map(booking => ({
       ...booking,
       id: booking._id?.toString() || booking._id
     }));
-    
+
     res.json(transformedBookings);
   } catch (error) {
     console.error('Fetch bookings error:', error);
@@ -1146,16 +1154,16 @@ app.get('/api/admin/bookings', async (req, res) => {
 app.get('/api/admin/bookings/export', async (req, res) => {
   try {
     const bookingId = req.query.id;
-    
+
     if (!bookingId) {
       return res.status(400).json({ error: 'No booking ID specified for export' });
     }
-    
+
     const booking = await Booking.findById(bookingId);
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
-    
+
     // Generate PDF or CSV - for now, return JSON that will be exported
     const csv = generateBookingCSV(booking);
     res.setHeader('Content-Type', 'text/csv');
@@ -1184,10 +1192,10 @@ function generateBookingCSV(booking) {
     ['Deposit Paid', booking.depositPaid ? 'Yes' : 'No'],
     ['Paid At', booking.stripePaidAt ? new Date(booking.stripePaidAt).toLocaleString() : 'N/A']
   ];
-  
+
   const headerString = headers.join(',');
   const rowStrings = rows.map(row => `"${row[0]}","${row[1] || ''}"`).join('\n');
-  
+
   return `${headerString}\n${rowStrings}`;
 }
 
@@ -1197,7 +1205,7 @@ app.get('/api/admin/bookings/:id', async (req, res) => {
     if (!req.params.id || req.params.id === 'undefined') {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
-    
+
     const booking = await Booking.findById(req.params.id);
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
     res.json(booking);
@@ -1213,22 +1221,22 @@ app.post('/api/admin/bookings/:id/confirm', csrfProtection, async (req, res) => 
     if (!req.params.id || req.params.id === 'undefined') {
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
-    
+
     const booking = await Booking.findByIdAndUpdate(
       req.params.id,
       { status: 'confirmed' },
       { new: true }
     );
-    
+
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
-    
+
     res.json({
       ...booking.toObject(),
       csrfToken: req.csrfToken() // Send new token
     });
   } catch (error) {
     console.error('Confirm booking error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to confirm booking',
       csrfToken: req.csrfToken() // Send new token on error
     });
@@ -1239,7 +1247,7 @@ app.get('/api/admin/bookings/export', async (req, res) => {
   try {
     let dataToExport;
     const { id, format = 'json' } = req.query;
-    
+
     if (id) {
       const booking = await Booking.findById(id);
       if (!booking) return res.status(404).json({ error: 'Booking not found' });
@@ -1247,7 +1255,7 @@ app.get('/api/admin/bookings/export', async (req, res) => {
     } else {
       dataToExport = await Booking.find({}).sort({ createdAt: -1 });
     }
-    
+
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', `attachment; filename=booking${id ? `-${id}` : 's'}.json`);
     res.send(JSON.stringify(dataToExport, null, 2));
@@ -1261,25 +1269,25 @@ app.get('/api/admin/bookings/export', async (req, res) => {
 app.get('/api/admin/messages', async (req, res) => {
   try {
     const filter = {};
-    
+
     if (req.query.includeArchived !== 'true') {
       filter.archived = false;
     }
-    
+
     if (req.query.unread === 'true') {
       filter.read = false;
     }
-    
+
     const messages = await Message.find(filter)
       .sort({ createdAt: -1 })
       .lean();
-    
+
     // Transform _id to id for frontend compatibility
     const transformedMessages = messages.map(message => ({
       ...message,
       id: message._id?.toString() || message._id
     }));
-    
+
     res.json(transformedMessages);
   } catch (error) {
     console.error('Fetch messages error:', error);
@@ -1293,15 +1301,15 @@ app.get('/api/admin/messages/:id', async (req, res) => {
     if (!req.params.id || req.params.id === 'undefined') {
       return res.status(400).json({ error: 'Invalid message ID' });
     }
-    
+
     const message = await Message.findByIdAndUpdate(
       req.params.id,
       { read: true },
       { new: true }
     );
-    
+
     if (!message) return res.status(404).json({ error: 'Message not found' });
-    
+
     res.json(message);
   } catch (error) {
     console.error('Fetch message error:', error);
@@ -1316,18 +1324,18 @@ app.post('/api/admin/messages/:id/mark-read', csrfProtection, async (req, res) =
       { read: true },
       { new: true }
     );
-    
+
     if (!message) return res.status(404).json({ error: 'Message not found' });
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: 'Message marked as read',
       data: message,
       csrfToken: req.csrfToken()
     });
   } catch (error) {
     console.error('Mark read error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to mark message as read',
       csrfToken: req.csrfToken()
     });
@@ -1336,20 +1344,20 @@ app.post('/api/admin/messages/:id/mark-read', csrfProtection, async (req, res) =
 
 // ===== Email Configuration =====
 const emailTransporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: process.env.EMAIL_SECURE === 'true', // true for 465, false for other ports
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
+  host: process.env.EMAIL_HOST,
+  port: process.env.EMAIL_PORT,
+  secure: process.env.EMAIL_SECURE === 'true', // true for 465, false for other ports
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
 });
-  
-  // Email templates
-  const getContactEmailTemplate = (name, formData) => {
-    return {
-      subject: 'Thank you for contacting Ami Photography!',
-      html: `
+
+// Email templates
+const getContactEmailTemplate = (name, formData) => {
+  return {
+    subject: 'Thank you for contacting Ami Photography!',
+    html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #333;">Hi ${name},</h2>
           <p>Thank you for reaching out to Ami Photography! We've received your inquiry and are excited to potentially work with you.</p>
@@ -1370,13 +1378,13 @@ const emailTransporter = nodemailer.createTransport({
           ✉️ info@amiphotography.com</p>
         </div>
       `
-    };
   };
-  
-  const getBookingEmailTemplate = (name, formData) => {
-    return {
-      subject: 'Booking Request Confirmation - Ami Photography',
-      html: `
+};
+
+const getBookingEmailTemplate = (name, formData) => {
+  return {
+    subject: 'Booking Request Confirmation - Ami Photography',
+    html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #333;">Hi ${name},</h2>
           <p>Thank you for your booking request! We're thrilled that you've chosen Ami Photography for your special event.</p>
@@ -1400,17 +1408,17 @@ const emailTransporter = nodemailer.createTransport({
           ✉️ info@amiphotography.com</p>
         </div>
       `
-    };
   };
-  
-  const getTaxReceiptEmailTemplate = (booking) => {
-    const amount = (booking.packageAmount / 100 || booking.estimatedCost || 0).toFixed(2);
-    const receiptDate = new Date(booking.stripePaidAt || new Date()).toLocaleDateString();
-    const receiptId = `AMI-${booking._id.toString().slice(-8).toUpperCase()}-${new Date().getFullYear()}`;
-    
-    return {
-      subject: 'Tax Receipt for Photography Services - Ami Photography',
-      html: `
+};
+
+const getTaxReceiptEmailTemplate = (booking) => {
+  const amount = (booking.packageAmount / 100 || booking.estimatedCost || 0).toFixed(2);
+  const receiptDate = new Date(booking.stripePaidAt || new Date()).toLocaleDateString();
+  const receiptId = `AMI-${booking._id.toString().slice(-8).toUpperCase()}-${new Date().getFullYear()}`;
+
+  return {
+    subject: 'Tax Receipt for Photography Services - Ami Photography',
+    html: `
         <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
             <h1 style="margin: 0 0 10px 0; font-size: 28px;">Ami Photography</h1>
@@ -1489,16 +1497,16 @@ const emailTransporter = nodemailer.createTransport({
           </div>
         </div>
       `
-    };
   };
-  
-  const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
-    const amount = (booking.packageAmount / 100 || 0).toFixed(2);
-    const refund = (refundAmount / 100).toFixed(2);
-    
-    return {
-      subject: 'Booking Cancellation Confirmation - Ami Photography',
-      html: `
+};
+
+const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
+  const amount = (booking.packageAmount / 100 || 0).toFixed(2);
+  const refund = (refundAmount / 100).toFixed(2);
+
+  return {
+    subject: 'Booking Cancellation Confirmation - Ami Photography',
+    html: `
         <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
             <h1 style="margin: 0 0 10px 0; font-size: 28px;">Booking Cancelled</h1>
@@ -1554,15 +1562,15 @@ const emailTransporter = nodemailer.createTransport({
           </div>
         </div>
       `
-    };
   };
-  
-  const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
-    const eventDate = new Date(booking.eventDate);
-    
-    return {
-      subject: 'Reschedule Request Received - Ami Photography',
-      html: `
+};
+
+const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
+  const eventDate = new Date(booking.eventDate);
+
+  return {
+    subject: 'Reschedule Request Received - Ami Photography',
+    html: `
         <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
             <h1 style="margin: 0 0 10px 0; font-size: 28px;">Reschedule Request Received</h1>
@@ -1612,26 +1620,26 @@ const emailTransporter = nodemailer.createTransport({
           </div>
         </div>
       `
-    };
   };
-  
-  // Email sending function
-  async function sendConfirmationEmail(email, template) {
-    try {
-      const mailOptions = {
-        from: `"Ami Photography" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: template.subject,
-        html: template.html
-      };
-      
-      const result = await emailTransporter.sendMail(mailOptions);
-      console.log('Email sent successfully:', result.messageId);
-      return { success: true, messageId: result.messageId };
-    } catch (error) {
-      console.error('Email sending failed:', error);
-      return { success: false, error: error.message };
-    }
+};
+
+// Email sending function
+async function sendConfirmationEmail(email, template) {
+  try {
+    const mailOptions = {
+      from: `"Ami Photography" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: template.subject,
+      html: template.html
+    };
+
+    const result = await emailTransporter.sendMail(mailOptions);
+    console.log('Email sent successfully:', result.messageId);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error('Email sending failed:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 // Logout
@@ -1648,121 +1656,121 @@ app.post('/api/admin/logout', (req, res) => {
 
 // ===== Contact Message Submission Route with CSRF Protection =====
 app.post('/api/submit-contact', csrfProtection, async (req, res) => {
-    try {
-      const { name, email, phone, subject, message } = req.body;
-  
-      if (!name || !email || !message) {
-        return res.status(400).json({
-          success: false,
-          message: 'Missing required fields (name, email, message)',
-          csrfToken: req.csrfToken()
-        });
-      }
-  
-      const newMessage = new Message({
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone ? phone.trim() : '',
-        subject: subject || 'General Inquiry',
-        message: message.trim(),
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-  
-      const savedMessage = await newMessage.save();
-  
-      // Send confirmation email
-      const emailTemplate = getContactEmailTemplate(name, {
-        subject: subject || 'General Inquiry',
-        message: message
-      });
-      
-      const emailResult = await sendConfirmationEmail(email, emailTemplate);
-  
-      res.status(201).json({
-        success: true,
-        message: 'Message sent successfully!',
-        messageId: savedMessage._id,
-        emailSent: emailResult.success,
-        csrfToken: req.csrfToken()
-      });
-    } catch (error) {
-      console.error('Contact form error:', error);
-      res.status(500).json({
+  try {
+    const { name, email, phone, subject, message } = req.body;
+
+    if (!name || !email || !message) {
+      return res.status(400).json({
         success: false,
-        message: 'Failed to send message',
+        message: 'Missing required fields (name, email, message)',
         csrfToken: req.csrfToken()
       });
     }
+
+    const newMessage = new Message({
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone ? phone.trim() : '',
+      subject: subject || 'General Inquiry',
+      message: message.trim(),
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+
+    const savedMessage = await newMessage.save();
+
+    // Send confirmation email
+    const emailTemplate = getContactEmailTemplate(name, {
+      subject: subject || 'General Inquiry',
+      message: message
+    });
+
+    const emailResult = await sendConfirmationEmail(email, emailTemplate);
+
+    res.status(201).json({
+      success: true,
+      message: 'Message sent successfully!',
+      messageId: savedMessage._id,
+      emailSent: emailResult.success,
+      csrfToken: req.csrfToken()
+    });
+  } catch (error) {
+    console.error('Contact form error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send message',
+      csrfToken: req.csrfToken()
+    });
+  }
 });
 
 // ===== Booking Submission Route with CSRF Protection =====
 app.post('/submit-booking', csrfProtection, async (req, res) => {
-    try {
-      const {
-        name,
-        email,
-        phone,
-        eventType,
-        date,
-        package: packageType,
-        startTime,
-        endTime,
-        location,
-        details
-      } = req.body;
-  
-      if (!name || !email || !phone || !eventType || !date || !packageType || !startTime || !endTime || !location) {
-        return res.status(400).json({
-          success: false,
-          message: 'Missing required fields',
-          csrfToken: req.csrfToken()
-        });
-      }
-  
-      const newBooking = new Booking({
-        clientName: name,
-        clientEmail: email,
-        clientPhone: phone,
-        eventType,
-        eventDate: new Date(`${date} ${startTime}`),
-        package: packageType,
-        startTime,
-        endTime,
-        location,
-        additionalNotes: details || ''
+  try {
+    const {
+      name,
+      email,
+      phone,
+      eventType,
+      date,
+      package: packageType,
+      startTime,
+      endTime,
+      location,
+      details
+    } = req.body;
+
+    if (!name || !email || !phone || !eventType || !date || !packageType || !startTime || !endTime || !location) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields',
+        csrfToken: req.csrfToken()
       });
-  
-      const savedBooking = await newBooking.save();
-  
-      // Send confirmation email
-      const emailTemplate = getBookingEmailTemplate(name, {
-        eventType,
-        date,
-        startTime,
-        endTime,
-        location,
-        package: packageType,
-        details
-      });
-      
-      const emailResult = await sendConfirmationEmail(email, emailTemplate);
-  
-      res.status(201).json({
-          success: true,
-          message: 'Booking request received successfully!',
-          bookingId: savedBooking._id,
-          emailSent: emailResult.success,
-          csrfToken: req.csrfToken()
-      });
-      } catch (error) {
-          console.error('Booking submission error:', error);
-          res.status(500).json({
-              success: false,
-              message: 'Failed to process booking',
-              csrfToken: req.csrfToken()
-          });
-      }
+    }
+
+    const newBooking = new Booking({
+      clientName: name,
+      clientEmail: email,
+      clientPhone: phone,
+      eventType,
+      eventDate: new Date(`${date} ${startTime}`),
+      package: packageType,
+      startTime,
+      endTime,
+      location,
+      additionalNotes: details || ''
+    });
+
+    const savedBooking = await newBooking.save();
+
+    // Send confirmation email
+    const emailTemplate = getBookingEmailTemplate(name, {
+      eventType,
+      date,
+      startTime,
+      endTime,
+      location,
+      package: packageType,
+      details
+    });
+
+    const emailResult = await sendConfirmationEmail(email, emailTemplate);
+
+    res.status(201).json({
+      success: true,
+      message: 'Booking request received successfully!',
+      bookingId: savedBooking._id,
+      emailSent: emailResult.success,
+      csrfToken: req.csrfToken()
+    });
+  } catch (error) {
+    console.error('Booking submission error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process booking',
+      csrfToken: req.csrfToken()
+    });
+  }
 });
 
 // ===== Serve Frontend Static Files in Production =====
@@ -1797,7 +1805,7 @@ app.use((err, req, res, next) => {
     });
   }
 
-  res.status(err.status || 500).json({ 
+  res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
     ...(process.env.NODE_ENV === 'development' && { details: err.stack })
   });

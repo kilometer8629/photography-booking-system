@@ -19,6 +19,7 @@ const morgan = require('morgan');
 const csrf = require('csurf');
 const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
+const cookieParser = require('cookie-parser');
 const { DateTime } = require('luxon');
 const {
   getAvailabilityForDate,
@@ -187,11 +188,13 @@ if (mongoUri) {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Session middleware
+// Session & cookie configuration
 const sessionSecret = process.env.SESSION_SECRET || uuidv4();
 if (!process.env.SESSION_SECRET) {
   console.warn('SESSION_SECRET is not set. Using an ephemeral secret; sessions will reset on each deploy.');
 }
+
+app.use(cookieParser(process.env.COOKIE_SECRET || sessionSecret));
 
 let sessionStore;
 if (mongoUri) {
@@ -230,13 +233,21 @@ app.use(session({
 
 
 // CSRF middleware
+const csrfCookieOptions = {
+  key: process.env.CSRF_COOKIE_NAME || 'ss.csrf',
+  httpOnly: true,
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  maxAge: 24 * 60 * 60 * 1000
+};
+
 const csrfProtection = csrf({
-  cookie: false,
+  cookie: csrfCookieOptions,
   value: (req) => req.headers['x-csrf-token'] || req.body._csrf
 });
 
 const csrfTokenOnly = csrf({
-  cookie: false,
+  cookie: csrfCookieOptions,
   value: () => ''
 });
 
@@ -1117,36 +1128,38 @@ app.post('/api/submit-contact', csrfProtection, async (req, res) => {
     });
   }
 
-  // Handle unknown API routes
-  app.use('/api', (req, res) => {
-    res.status(404).json({ error: 'Endpoint not found' });
+  // Do not register middleware inside route handlers
+});
+
+// Handle unknown API routes
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
+
+// Centralized error handling
+app.use((err, req, res, next) => {
+  console.error('Error:', {
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    url: req.originalUrl,
+    method: req.method,
+    status: err.status || 500
   });
 
-  // Centralized error handling
-  app.use((err, req, res, next) => {
-    console.error('Error:', {
-      message: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-      url: req.originalUrl,
-      method: req.method,
-      status: err.status || 500
-    });
-
-    if (err.code === 'EBADCSRFTOKEN') {
-      try {
-        return res.status(403).json({
-          error: 'Invalid CSRF token',
-          csrfToken: req.csrfToken()
-        });
-      } catch (tokenError) {
-        console.error('Failed to generate replacement CSRF token:', tokenError);
-        return res.status(403).json({ error: 'Invalid CSRF token' });
-      }
+  if (err.code === 'EBADCSRFTOKEN') {
+    try {
+      return res.status(403).json({
+        error: 'Invalid CSRF token',
+        csrfToken: req.csrfToken()
+      });
+    } catch (tokenError) {
+      console.error('Failed to generate replacement CSRF token:', tokenError);
+      return res.status(403).json({ error: 'Invalid CSRF token' });
     }
+  }
 
-    res.status(err.status || 500).json({
-      error: err.message || 'Internal server error'
-    });
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error'
   });
 });
 
