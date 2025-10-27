@@ -24,8 +24,8 @@ async function getZohoDiagnostics(options = {}) {
       calendar_base_url: process.env.ZOHO_CALENDAR_BASE_URL || 'Not set (using default)',
       calendar_id: process.env.ZOHO_CALENDAR_ID || 'Not set (using default: primary)',
       freebusy_user: process.env.ZOHO_FREEBUSY_USER ? 'Configured' : 'Not set',
-      timezone: process.env.ZOHO_TIMEZONE || 'Not set (using default)',
-      slot_minutes: process.env.BOOKING_SLOT_MINUTES || 'Not set (using default)',
+      timezone: process.env.ZOHO_TIMEZONE || 'Not set (using default: Australia/Sydney)',
+      slot_minutes: process.env.BOOKING_SLOT_MINUTES || 'Not set (using default: 5)',
       operating_hours: `${process.env.BOOKING_START_HOUR || '10'}:00 - ${process.env.BOOKING_END_HOUR || '16'}:00`
     },
     status: 'unknown',
