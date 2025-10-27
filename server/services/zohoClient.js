@@ -56,9 +56,11 @@ async function getAccessToken() {
 
   const now = Date.now();
   if (cachedAccessToken && cachedAccessExpiry > now) {
+    console.log('[Zoho] Using cached access token');
     return cachedAccessToken;
   }
 
+  console.log('[Zoho] Refreshing access token...');
   const tokenUrl = `${accountsBaseUrl}/oauth/v2/token`;
   const response = await fetch(tokenUrl, {
     method: 'POST',
@@ -70,12 +72,14 @@ async function getAccessToken() {
 
   if (!response.ok) {
     const errorBody = await response.text();
+    console.error(`[Zoho] Token refresh failed: ${response.status} ${errorBody}`);
     throw new Error(`[Zoho] Failed to refresh access token: ${response.status} ${errorBody}`);
   }
 
   const data = await response.json();
   cachedAccessToken = data.access_token;
   cachedAccessExpiry = now + ((data.expires_in || 3600) - 60) * 1000;
+  console.log('[Zoho] Access token refreshed successfully');
 
   return cachedAccessToken;
 }
@@ -184,6 +188,7 @@ async function fetchFreeBusy(rangeStart, rangeEnd) {
     throw new Error('Zoho free/busy user email is not configured.');
   }
 
+  console.log(`[Zoho] Fetching free/busy data for ${freeBusyUser} from ${rangeStart.toISO()} to ${rangeEnd.toISO()}`);
   const token = await getAccessToken();
 
   const url = new URL('/api/v1/calendars/freebusy', calendarBaseUrl);
@@ -191,6 +196,8 @@ async function fetchFreeBusy(rangeStart, rangeEnd) {
   url.searchParams.set('sdate', rangeStart.toFormat("yyyyMMdd'T'HHmmss"));
   url.searchParams.set('edate', rangeEnd.toFormat("yyyyMMdd'T'HHmmss"));
   url.searchParams.set('ftype', 'timebased');
+
+  console.log(`[Zoho] API Request: ${url.toString()}`);
 
   const response = await fetch(url, {
     headers: {
@@ -201,44 +208,59 @@ async function fetchFreeBusy(rangeStart, rangeEnd) {
 
   if (!response.ok) {
     const errorBody = await response.text();
+    console.error(`[Zoho] Free/busy fetch failed: ${response.status} ${errorBody}`);
     throw new Error(`[Zoho] Failed to fetch free/busy data: ${response.status} ${errorBody}`);
   }
 
   const payload = await response.json();
+  console.log(`[Zoho] Free/busy data received, keys: ${Object.keys(payload).join(', ')}`);
   const freeBusyMap = payload.freebusy || payload;
-  return freeBusyMap[freeBusyUser] || {};
+  const userBusyData = freeBusyMap[freeBusyUser] || {};
+  console.log(`[Zoho] User busy data contains ${Object.keys(userBusyData).length} date(s)`);
+  return userBusyData;
 }
 
 
 
 async function getAvailabilityForDate(date) {
+  console.log(`[Zoho] getAvailabilityForDate called for: ${date}`);
   const { dayStart, dayEnd, slots } = buildSlotsForDay(date, { timezone: calendarTimezone, startHour: operatingStartHour, endHour: operatingEndHour, slotMinutes });
+  console.log(`[Zoho] Built ${slots.length} slots for ${date} (${operatingStartHour}:00 - ${operatingEndHour}:00)`);
   const busyMap = await fetchFreeBusy(dayStart, dayEnd);
   const dayKey = dayStart.toFormat('yyyyMMdd');
   const events = buildBusyEventsForDay(dayKey, busyMap[dayKey], dayStart, dayEnd);
-  return filterSlots(slots, events, { timezone: calendarTimezone, slotMinutes });
+  console.log(`[Zoho] Found ${events.length} busy event(s) for ${date}`);
+  const availableSlots = filterSlots(slots, events, { timezone: calendarTimezone, slotMinutes });
+  console.log(`[Zoho] Returning ${availableSlots.length} available slot(s) for ${date}`);
+  return availableSlots;
 }
 
 async function getAvailabilityForRange(startDate, endDate) {
+  console.log(`[Zoho] getAvailabilityForRange called for: ${startDate} to ${endDate}`);
   const start = DateTime.fromISO(startDate, { zone: calendarTimezone }).startOf('day');
   const end = DateTime.fromISO(endDate, { zone: calendarTimezone }).endOf('day');
 
   const days = {};
   const busyMap = await fetchFreeBusy(start, end);
   let cursor = start;
+  let totalSlots = 0;
 
   while (cursor <= end) {
     const dateKey = cursor.toISODate();
     const { dayStart, dayEnd, slots } = buildSlotsForDay(dateKey, { timezone: calendarTimezone, startHour: operatingStartHour, endHour: operatingEndHour, slotMinutes });
     const busyEvents = buildBusyEventsForDay(cursor.toFormat('yyyyMMdd'), busyMap[cursor.toFormat('yyyyMMdd')], dayStart, dayEnd);
-    days[dateKey] = filterSlots(slots, busyEvents, { timezone: calendarTimezone, slotMinutes });
+    const availableSlots = filterSlots(slots, busyEvents, { timezone: calendarTimezone, slotMinutes });
+    days[dateKey] = availableSlots;
+    totalSlots += availableSlots.length;
     cursor = cursor.plus({ days: 1 });
   }
 
+  console.log(`[Zoho] Returning availability for ${Object.keys(days).length} day(s) with ${totalSlots} total available slot(s)`);
   return days;
 }
 
 async function createZohoEvent({ date, time, durationMinutes = slotMinutes, summary, description, location }) {
+  console.log(`[Zoho] Creating event: ${summary} on ${date} at ${time} for ${durationMinutes} minutes`);
   const startDateTime = DateTime.fromISO(`${date}T${time}`, { zone: calendarTimezone });
   if (!startDateTime.isValid) {
     throw new Error('Invalid date/time supplied for Zoho event.');
@@ -265,6 +287,7 @@ async function createZohoEvent({ date, time, durationMinutes = slotMinutes, summ
 
   // Add eventdata as URL query parameter
   url.searchParams.set('eventdata', JSON.stringify(eventdata));
+  console.log(`[Zoho] API Request: POST ${url.toString()}`);
 
   const response = await fetch(url, {
     method: 'POST',
@@ -276,6 +299,7 @@ async function createZohoEvent({ date, time, durationMinutes = slotMinutes, summ
 
   if (!response.ok) {
     const errorBody = await response.text();
+    console.error(`[Zoho] Event creation failed: ${response.status} ${errorBody}`);
     throw new Error(`[Zoho] Failed to create event: ${response.status} ${errorBody}`);
   }
 
@@ -290,9 +314,11 @@ async function createZohoEvent({ date, time, durationMinutes = slotMinutes, summ
   const event = normaliseEvent(eventData);
 
   if (!event) {
+    console.error('[Zoho] Invalid event response from API');
     throw new Error('[Zoho] Invalid event response.');
   }
 
+  console.log(`[Zoho] Event created successfully with ID: ${event.id}`);
   return {
     id: event.id,
     start: event.start,

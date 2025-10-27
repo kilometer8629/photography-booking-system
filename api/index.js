@@ -381,13 +381,13 @@ app.get('/api/availability', async (req, res) => {
   try {
     const { start, end, date } = req.query;
 
-    console.log('[API] /api/availability called', { start, end, date });
+    console.log('[API] /api/availability called', { start, end, date, timestamp: new Date().toISOString() });
 
     // If date is provided, get availability for that specific date
     if (date) {
       console.log(`[Zoho] Fetching availability for date: ${date}`);
       const availability = await getAvailabilityForDate(date);
-      console.log(`[Zoho] Got availability for ${date}:`, availability);
+      console.log(`[Zoho] Got ${availability.length} slot(s) for ${date}`);
       return res.json(availability);
     }
 
@@ -395,7 +395,9 @@ app.get('/api/availability', async (req, res) => {
     if (start && end) {
       console.log(`[Zoho] Fetching availability range: ${start} to ${end}`);
       const availability = await getAvailabilityForRange(start, end);
-      console.log(`[Zoho] Got availability range:`, availability);
+      const totalDays = Object.keys(availability).length;
+      const totalSlots = Object.values(availability).reduce((sum, slots) => sum + slots.length, 0);
+      console.log(`[Zoho] Got availability for ${totalDays} day(s) with ${totalSlots} total slot(s)`);
       return res.json(availability);
     }
 
@@ -403,7 +405,7 @@ app.get('/api/availability', async (req, res) => {
     console.warn('[API] No date or date range provided to /api/availability');
     res.json({ availability: [] });
   } catch (error) {
-    console.error('[API] Error fetching availability:', error);
+    console.error('[API] Error fetching availability:', error.message, error.stack);
     res.status(500).json({ error: 'Unable to load availability', details: error.message });
   }
 });

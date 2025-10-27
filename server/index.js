@@ -617,11 +617,14 @@ app.post('/api/create-checkout-session', csrfProtection, async (req, res) => {
 app.get('/api/availability', async (req, res) => {
   try {
     const { date, start, end } = req.query || {};
+    console.log('[API] /api/availability endpoint called', { date, start, end, timestamp: new Date().toISOString() });
 
     // Fetch booked slots from database
+    console.log('[API] Fetching booked slots from database...');
     const bookedSlots = await Booking.find({
       status: { $in: ['confirmed', 'pending'] }
     }).select('eventDate startTime').lean();
+    console.log(`[API] Found ${bookedSlots.length} booked slot(s) in database`);
 
     const bookedSet = new Set();
     bookedSlots.forEach((booking) => {
@@ -632,8 +635,10 @@ app.get('/api/availability', async (req, res) => {
     });
 
     if (date) {
+      console.log(`[API] Requesting availability for single date: ${date}`);
       const slots = await getAvailabilityForDate(date);
       const filteredSlots = slots.filter((slot) => !bookedSet.has(`${date}:${slot}`));
+      console.log(`[API] Returning ${filteredSlots.length} available slot(s) for ${date} (${slots.length - filteredSlots.length} filtered by bookings)`);
       return res.json({
         date,
         slots: filteredSlots,
@@ -642,21 +647,28 @@ app.get('/api/availability', async (req, res) => {
     }
 
     if (start && end) {
+      console.log(`[API] Requesting availability for date range: ${start} to ${end}`);
       const days = await getAvailabilityForRange(start, end);
       const filteredDays = {};
+      let totalSlots = 0;
+      let totalFiltered = 0;
       Object.entries(days).forEach(([dayDate, daySlots]) => {
         const filtered = daySlots.filter((slot) => !bookedSet.has(`${dayDate}:${slot}`));
         filteredDays[dayDate] = filtered;
+        totalSlots += daySlots.length;
+        totalFiltered += filtered.length;
       });
+      console.log(`[API] Returning ${totalFiltered} available slot(s) across ${Object.keys(filteredDays).length} day(s) (${totalSlots - totalFiltered} filtered by bookings)`);
       return res.json({
         days: filteredDays,
         slotMinutes: zohoSettings.slotMinutes
       });
     }
 
+    console.warn('[API] No date or date range provided');
     return res.status(400).json({ error: 'Please provide a date or range to check availability.' });
   } catch (error) {
-    console.error('Availability fetch error:', error);
+    console.error('[API] Availability fetch error:', error.message, error.stack);
     try {
       const fallbackConfig = {
         timezone: zohoSettings.calendarTimezone || 'Australia/Sydney',
