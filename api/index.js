@@ -689,6 +689,11 @@ app.get('/api/booking-confirmation', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Session ID required' });
     }
 
+    // Validate session_id format (Stripe session IDs start with 'cs_')
+    if (typeof session_id !== 'string' || !session_id.startsWith('cs_')) {
+      return res.status(400).json({ success: false, error: 'Invalid session ID format' });
+    }
+
     // Find booking by Stripe session ID
     const booking = await Booking.findOne({ stripeSessionId: session_id });
 
@@ -726,8 +731,19 @@ app.get('/api/customer/booking', async (req, res) => {
   try {
     const { email, bookingId } = req.query;
 
-    if (!email) {
+    if (!email || typeof email !== 'string') {
       return res.status(400).json({ error: 'Email address required' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Validate bookingId format if provided (MongoDB ObjectId is 24 hex chars)
+    if (bookingId && (typeof bookingId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(bookingId))) {
+      return res.status(400).json({ error: 'Invalid booking ID format' });
     }
 
     // Find by booking ID first if provided, otherwise find by email
@@ -903,6 +919,21 @@ app.post('/api/customer/reschedule', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Validate bookingId format (MongoDB ObjectId is 24 hex chars)
+    if (typeof bookingId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID format' });
+    }
+
+    // Validate date format (ISO 8601 date: YYYY-MM-DD)
+    if (typeof newDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+    }
+
+    // Validate time format (HH:MM)
+    if (typeof newTime !== 'string' || !/^\d{2}:\d{2}$/.test(newTime)) {
+      return res.status(400).json({ error: 'Invalid time format. Use HH:MM' });
+    }
+
     const booking = await Booking.findById(bookingId);
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -942,6 +973,11 @@ app.post('/api/customer/cancel', async (req, res) => {
 
     if (!bookingId) {
       return res.status(400).json({ error: 'Booking ID required' });
+    }
+
+    // Validate bookingId format (MongoDB ObjectId is 24 hex chars)
+    if (typeof bookingId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(bookingId)) {
+      return res.status(400).json({ error: 'Invalid booking ID format' });
     }
 
     const booking = await Booking.findById(bookingId);
