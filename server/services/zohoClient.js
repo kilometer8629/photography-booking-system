@@ -18,8 +18,22 @@ const {
   BOOKING_END_HOUR
 } = process.env;
 
+// Enhanced logging for debugging environment variables
+console.log('[Zoho Init] Checking environment variables...');
+console.log('[Zoho Init] NODE_ENV:', process.env.NODE_ENV);
+console.log('[Zoho Init] VERCEL:', process.env.VERCEL);
+console.log('[Zoho Init] ZOHO_OAUTH_CLIENT_ID set:', !!ZOHO_OAUTH_CLIENT_ID);
+console.log('[Zoho Init] ZOHO_OAUTH_CLIENT_SECRET set:', !!ZOHO_OAUTH_CLIENT_SECRET);
+console.log('[Zoho Init] ZOHO_OAUTH_REFRESH_TOKEN set:', !!ZOHO_OAUTH_REFRESH_TOKEN);
+console.log('[Zoho Init] All process.env keys:', Object.keys(process.env).filter(k => k.includes('ZOHO')).join(', '));
+
 if (!ZOHO_OAUTH_CLIENT_ID || !ZOHO_OAUTH_CLIENT_SECRET || !ZOHO_OAUTH_REFRESH_TOKEN) {
   console.warn('[Zoho] OAuth credentials are not fully configured. Calendar sync will be disabled.');
+  console.warn('[Zoho] Missing:', {
+    CLIENT_ID: !ZOHO_OAUTH_CLIENT_ID,
+    CLIENT_SECRET: !ZOHO_OAUTH_CLIENT_SECRET,
+    REFRESH_TOKEN: !ZOHO_OAUTH_REFRESH_TOKEN
+  });
 }
 
 const accountsBaseUrl = (ZOHO_ACCOUNTS_BASE_URL || 'https://accounts.zoho.com.au').replace(/\/+$/, '');
@@ -104,14 +118,14 @@ const parseZohoDateTime = (value) => {
 
 const normaliseEvent = (event) => {
   const start = parseZohoDateTime(
-    event.start || 
-    event.startTime || 
+    event.start ||
+    event.startTime ||
     event.when?.startTime ||
     event.dateandtime?.start  // Handle Zoho API v1 format
   );
   const end = parseZohoDateTime(
-    event.end || 
-    event.endTime || 
+    event.end ||
+    event.endTime ||
     event.when?.endTime ||
     event.dateandtime?.end  // Handle Zoho API v1 format
   );
@@ -324,13 +338,13 @@ async function createZohoEvent({ date, time, durationMinutes = slotMinutes, summ
   }
 
   const body = await response.json();
-  
+
   // Zoho API returns {events: [...]} array for POST create
   let eventData = body;
   if (body.events && Array.isArray(body.events) && body.events.length > 0) {
     eventData = body.events[0];
   }
-  
+
   const event = normaliseEvent(eventData);
 
   if (!event) {
