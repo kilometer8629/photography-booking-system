@@ -150,14 +150,14 @@ if (mongoUri) {
     maxPoolSize: 50,
     wtimeoutMS: 2500
   })
-  .then(async () => {
-    console.log('[MongoDB] connected successfully');
-    mongoConnected = true;
-  })
-  .catch(err => {
-    console.error('[MongoDB] connection error:', err.message);
-    mongoConnected = false;
-  });
+    .then(async () => {
+      console.log('[MongoDB] connected successfully');
+      mongoConnected = true;
+    })
+    .catch(err => {
+      console.error('[MongoDB] connection error:', err.message);
+      mongoConnected = false;
+    });
 } else {
   console.warn('MONGODB_URI is not set. Skipping MongoDB connection; database-backed features are disabled.');
 }
@@ -240,10 +240,10 @@ async function getPackagePriceInfo(pkg) {
 
   if (unitAmount === null && Array.isArray(price.tiers) && price.tiers.length) {
     const primaryTier = price.tiers[0];
-    unitAmount = typeof primaryTier.unit_amount === 'number' ? primaryTier.unit_amount : 
-                 primaryTier.unit_amount_decimal ? Number(primaryTier.unit_amount_decimal) :
-                 typeof primaryTier.flat_amount === 'number' ? primaryTier.flat_amount :
-                 primaryTier.flat_amount_decimal ? Number(primaryTier.flat_amount_decimal) : null;
+    unitAmount = typeof primaryTier.unit_amount === 'number' ? primaryTier.unit_amount :
+      primaryTier.unit_amount_decimal ? Number(primaryTier.unit_amount_decimal) :
+        typeof primaryTier.flat_amount === 'number' ? primaryTier.flat_amount :
+          primaryTier.flat_amount_decimal ? Number(primaryTier.flat_amount_decimal) : null;
   }
 
   let formatted = null;
@@ -295,7 +295,7 @@ const getTaxReceiptEmailTemplate = (booking) => {
   const amount = (booking.packageAmount / 100 || booking.estimatedCost || 0).toFixed(2);
   const receiptDate = new Date(booking.stripePaidAt || new Date()).toLocaleDateString();
   const receiptId = `AMI-${booking._id.toString().slice(-8).toUpperCase()}-${new Date().getFullYear()}`;
-  
+
   return {
     subject: 'Tax Receipt for Photography Services - Ami Photography',
     html: `
@@ -338,7 +338,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       const booking = await Booking.findOne({ stripeSessionId: session.id });
-      
+
       if (booking) {
         booking.status = 'confirmed';
         booking.depositPaid = true;
@@ -379,9 +379,32 @@ app.post('/api/create-checkout-session', csrfProtection, async (req, res) => {
 
 app.get('/api/availability', async (req, res) => {
   try {
-    res.json({ slots: ['10:00', '10:15', '10:30', '10:45', '11:00'] });
+    const { start, end, date } = req.query;
+
+    console.log('[API] /api/availability called', { start, end, date });
+
+    // If date is provided, get availability for that specific date
+    if (date) {
+      console.log(`[Zoho] Fetching availability for date: ${date}`);
+      const availability = await getAvailabilityForDate(date);
+      console.log(`[Zoho] Got availability for ${date}:`, availability);
+      return res.json(availability);
+    }
+
+    // If start and end are provided, get range
+    if (start && end) {
+      console.log(`[Zoho] Fetching availability range: ${start} to ${end}`);
+      const availability = await getAvailabilityForRange(start, end);
+      console.log(`[Zoho] Got availability range:`, availability);
+      return res.json(availability);
+    }
+
+    // Default: return empty if no parameters
+    console.warn('[API] No date or date range provided to /api/availability');
+    res.json({ availability: [] });
   } catch (error) {
-    res.status(500).json({ error: 'Unable to load availability' });
+    console.error('[API] Error fetching availability:', error);
+    res.status(500).json({ error: 'Unable to load availability', details: error.message });
   }
 });
 
