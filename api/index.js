@@ -36,6 +36,22 @@ const { Booking, Message, Admin } = require('../server/models');
 // Create Express app
 const app = express();
 
+// Ensure Express trusts upstream proxies (required for accurate rate limiting on Vercel)
+const resolveTrustProxyValue = (value) => {
+  if (value === undefined) return undefined;
+  if (value === 'false') return false;
+  if (value === 'true') return true;
+  const numeric = Number(value);
+  return Number.isNaN(numeric) ? value : numeric;
+};
+
+const explicitTrustProxy = resolveTrustProxyValue(process.env.TRUST_PROXY);
+if (explicitTrustProxy !== undefined) {
+  app.set('trust proxy', explicitTrustProxy);
+} else {
+  app.set('trust proxy', 1);
+}
+
 // Production environment setup
 process.env.NODE_ENV = 'production';
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -124,54 +140,74 @@ app.use(cors({
 app.options('*', cors());
 
 // Connect to MongoDB
+const mongoUri = process.env.MONGODB_URI;
 let mongoConnected = false;
 
-const mongoConnection = mongoose.connect(process.env.MONGODB_URI, {
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-  maxPoolSize: 50,
-  wtimeoutMS: 2500
-})
-.then(async () => {
-  console.log('✅ MongoDB connected successfully');
-  mongoConnected = true;
-})
-.catch(err => {
-  console.error('❌ MongoDB connection error:', err.message);
-  mongoConnected = false;
-});
+if (mongoUri) {
+  mongoose.connect(mongoUri, {
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    maxPoolSize: 50,
+    wtimeoutMS: 2500
+  })
+  .then(async () => {
+    console.log('[MongoDB] connected successfully');
+    mongoConnected = true;
+  })
+  .catch(err => {
+    console.error('[MongoDB] connection error:', err.message);
+    mongoConnected = false;
+  });
+} else {
+  console.warn('MONGODB_URI is not set. Skipping MongoDB connection; database-backed features are disabled.');
+}
+
 
 // Middleware for body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Session middleware
-const sessionStore = MongoStore.create({
-  mongoUrl: process.env.MONGODB_URI,
-  collectionName: 'sessions',
-  ttl: 24 * 60 * 60,
-  autoRemove: 'interval',
-  autoRemoveInterval: 60,
-  crypto: {
-    secret: process.env.SESSION_SECRET.substring(0, 32)
+const sessionSecret = process.env.SESSION_SECRET || uuidv4();
+if (!process.env.SESSION_SECRET) {
+  console.warn('SESSION_SECRET is not set. Using an ephemeral secret; sessions will reset on each deploy.');
+}
+
+let sessionStore;
+if (mongoUri) {
+  const mongoStoreConfig = {
+    mongoUrl: mongoUri,
+    collectionName: 'sessions',
+    ttl: 24 * 60 * 60,
+    autoRemove: 'interval',
+    autoRemoveInterval: 60
+  };
+
+  if (sessionSecret) {
+    mongoStoreConfig.crypto = { secret: sessionSecret.substring(0, 32) };
   }
-});
+
+  sessionStore = MongoStore.create(mongoStoreConfig);
+} else {
+  sessionStore = new session.MemoryStore();
+}
 
 app.use(session({
   name: process.env.SESSION_NAME || 'southsydney.sid',
-  secret: process.env.SESSION_SECRET,
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
   store: sessionStore,
   cookie: {
     domain: process.env.COOKIE_DOMAIN,
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
     maxAge: 24 * 60 * 60 * 1000
   },
   rolling: true
 }));
+
 
 // CSRF middleware
 const csrfProtection = csrf({
