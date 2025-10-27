@@ -611,6 +611,17 @@
     </script>
 
 <script>
+    // Utility: Basic HTML escape to prevent DOM-based XSS from user input
+    function escapeHTML(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/\//g, '&#x2F;');
+    }
+
     function showToast(type, name, isBooking = false, email = '', phone = '') {
       // Create overlay
       const overlay = document.createElement('div');
@@ -627,15 +638,15 @@
       if (type === 'success') {
         if (isBooking) {
           message = `
-            <p>Thank you, <strong>${name}</strong>! Your booking request has been submitted successfully.</p>
+            <p>Thank you, <strong>${escapeHTML(name)}</strong>! Your booking request has been submitted successfully.</p>
             <p>We've received your inquiry and will get back to you within 24–48 hours to confirm your appointment details.</p>
-            <p>A confirmation has been sent to ${email}${phone ? ` and ${phone}` : ''}.</p>
+            <p>A confirmation has been sent to ${escapeHTML(email)}${phone ? ` and ${escapeHTML(phone)}` : ''}.</p>
           `;
         } else {
           message = `
-            <p>Thank you, <strong>${name}</strong>! Your message has been sent successfully.</p>
+            <p>Thank you, <strong>${escapeHTML(name)}</strong>! Your message has been sent successfully.</p>
             <p>We've received your inquiry and will get back to you within 24–48 hours.</p>
-            <p>A confirmation has been sent to ${email}${phone ? ` and ${phone}` : ''}.</p>
+            <p>A confirmation has been sent to ${escapeHTML(email)}${phone ? ` and ${escapeHTML(phone)}` : ''}.</p>
           `;
         }
       } else {
