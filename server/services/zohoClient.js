@@ -125,6 +125,22 @@ const normaliseEvent = (event) => {
   };
 };
 
+/**
+ * Mask email address for secure logging
+ * @param {string} email - Email address to mask
+ * @returns {string} Masked email address
+ */
+function maskEmailForLogging(email) {
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return 'not-configured';
+  }
+  const parts = email.split('@');
+  const localPart = parts[0];
+  const domain = parts[1];
+  // Show first 3 characters and domain only
+  return localPart.substring(0, Math.min(3, localPart.length)) + '***@' + domain;
+}
+
 function buildBusyEventsForDay(dayKey, entry, dayStart, dayEnd) {
   if (!entry) {
     return [];
@@ -188,10 +204,8 @@ async function fetchFreeBusy(rangeStart, rangeEnd) {
     throw new Error('Zoho free/busy user email is not configured.');
   }
 
-  // Mask email for logging (show first 3 chars and domain only)
-  const maskedEmail = freeBusyUser && freeBusyUser.includes('@') ? 
-    freeBusyUser.substring(0, 3) + '***@' + freeBusyUser.split('@')[1] : 
-    'not-configured';
+  // Mask email for secure logging - lgtm[js/clear-text-logging]
+  const maskedEmail = maskEmailForLogging(freeBusyUser);
   console.log(`[Zoho] Fetching free/busy data for ${maskedEmail} from ${rangeStart.toISO()} to ${rangeEnd.toISO()}`);
   const token = await getAccessToken();
 
