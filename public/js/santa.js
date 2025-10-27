@@ -171,11 +171,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.handleBooking = async (event) => {
     console.log('🎄 handleBooking called with event:', event?.type);
-    
+
     // CRITICAL: Prevent default form submission FIRST
     event.preventDefault();
     console.log('✅ event.preventDefault() called');
-    
+
     // Then handle the booking
     const form = event.target instanceof HTMLFormElement
       ? event.target
@@ -194,19 +194,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!bookingState.selectedDate || !bookingState.selectedTime) {
-      console.warn('❌ Missing date/time', {selectedDate: bookingState.selectedDate, selectedTime: bookingState.selectedTime});
+      console.warn('❌ Missing date/time', { selectedDate: bookingState.selectedDate, selectedTime: bookingState.selectedTime });
       showBookingError('Please select a session date and time before continuing.');
       return false;
     }
 
     if (!bookingState.selectedPackage) {
-      console.warn('❌ Missing package', {selectedPackage: bookingState.selectedPackage});
+      console.warn('❌ Missing package', { selectedPackage: bookingState.selectedPackage });
       showBookingError('Please choose a package to pre-purchase before checking out.');
       return false;
     }
 
     if (!bookingState.customerName.trim() || !bookingState.customerEmail.trim() || !bookingState.customerPhone.trim()) {
-      console.warn('❌ Missing customer details', {name: bookingState.customerName, email: bookingState.customerEmail, phone: bookingState.customerPhone});
+      console.warn('❌ Missing customer details', { name: bookingState.customerName, email: bookingState.customerEmail, phone: bookingState.customerPhone });
       showBookingError('Please add your name, email and mobile number before continuing.');
       return false;
     }
@@ -323,9 +323,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       state.selectedPackage = '';
       state.selectedPackageName = '';
-       state.selectedPackagePrice = '';
-       state.selectedPackageAmount = null;
-       state.selectedPackageCurrency = '';
+      state.selectedPackagePrice = '';
+      state.selectedPackageAmount = null;
+      state.selectedPackageCurrency = '';
       if (state.packageInput) {
         state.packageInput.value = '';
       }
@@ -452,11 +452,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (summaryDateDisplay) {
         summaryDateDisplay.textContent = bookingState.selectedDate
           ? new Date(bookingState.selectedDate).toLocaleDateString('en-AU', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            })
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          })
           : '—';
       }
       if (summaryTimeDisplay) {
@@ -653,6 +653,54 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+    const normalizeRangeAvailability = (payload) => {
+      if (!payload || Array.isArray(payload)) {
+        return { days: {}, slotMinutes: undefined, fallback: false };
+      }
+
+      if (payload.days && typeof payload.days === 'object' && !Array.isArray(payload.days)) {
+        return {
+          days: payload.days,
+          slotMinutes: payload.slotMinutes,
+          fallback: Boolean(payload.fallback)
+        };
+      }
+
+      const inferredDays = {};
+      Object.entries(payload).forEach(([key, value]) => {
+        if (isoDatePattern.test(key) && Array.isArray(value)) {
+          inferredDays[key] = value;
+        }
+      });
+
+      return {
+        days: inferredDays,
+        slotMinutes: payload.slotMinutes,
+        fallback: Boolean(payload.fallback)
+      };
+    };
+
+    const normalizeDayAvailability = (payload) => {
+      if (Array.isArray(payload)) {
+        return { slots: payload, slotMinutes: undefined, fallback: false };
+      }
+      if (!payload || typeof payload !== 'object') {
+        return { slots: [], slotMinutes: undefined, fallback: false };
+      }
+
+      if (Array.isArray(payload.slots)) {
+        return {
+          slots: payload.slots,
+          slotMinutes: payload.slotMinutes,
+          fallback: Boolean(payload.fallback)
+        };
+      }
+
+      return { slots: [], slotMinutes: payload.slotMinutes, fallback: Boolean(payload.fallback) };
+    };
+
     const fetchMonthAvailability = async (monthDate) => {
       const year = monthDate.getFullYear();
       const month = monthDate.getMonth();
@@ -673,11 +721,12 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!response.ok) {
             throw new Error(await response.text());
           }
-          const data = await response.json();
-          if (typeof data.slotMinutes === 'number') {
-            slotMinutesSetting = data.slotMinutes;
+          const payload = await response.json();
+          const normalized = normalizeRangeAvailability(payload);
+          if (typeof normalized.slotMinutes === 'number') {
+            slotMinutesSetting = normalized.slotMinutes;
           }
-          const days = data.days || {};
+          const { days } = normalized;
           Object.entries(days).forEach(([day, slots]) => {
             availabilityCache.set(day, Array.isArray(slots) ? slots : []);
           });
@@ -717,11 +766,12 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!response.ok) {
             throw new Error(await response.text());
           }
-          const data = await response.json();
-          if (typeof data.slotMinutes === 'number') {
-            slotMinutesSetting = data.slotMinutes;
+          const payload = await response.json();
+          const normalized = normalizeDayAvailability(payload);
+          if (typeof normalized.slotMinutes === 'number') {
+            slotMinutesSetting = normalized.slotMinutes;
           }
-          const slots = Array.isArray(data.slots) ? data.slots : [];
+          const slots = Array.isArray(normalized.slots) ? normalized.slots : [];
           availabilityCache.set(dateKey, slots);
           return slots;
         } catch (error) {
@@ -982,7 +1032,7 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryContainer.hidden = true;
         summaryContainer.dataset.disabled = 'true';
         summaryText.textContent = 'Please pick a date and time to continue.';
-        renderTimes('').catch(() => {});
+        renderTimes('').catch(() => { });
         updateSummaryCard();
         ensureCustomerFormState();
         syncSubmitState();
@@ -990,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     renderCalendar()
-      .then(() => renderTimes('').catch(() => {}))
+      .then(() => renderTimes('').catch(() => { }))
       .catch((error) => {
         console.error('Initial calendar render error:', error);
       });
