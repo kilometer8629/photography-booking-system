@@ -34,6 +34,25 @@ const Stripe = require('stripe');
 // Import Models
 const { Booking, Message, Admin } = require('../server/models');
 
+// ===== Helper Functions =====
+
+/**
+ * Escape HTML entities to prevent XSS attacks
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text safe for HTML
+ */
+function escapeHtml(text) {
+  if (typeof text !== 'string') return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
 // Create Express app
 const app = express();
 
@@ -752,7 +771,8 @@ app.get('/api/customer/booking', async (req, res) => {
 
 // Email template functions
 const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
-  const eventDate = new Date(booking.eventDate);
+  const eventDate = DateTime.fromJSDate(new Date(booking.eventDate), { zone: 'Australia/Sydney' });
+  const requestedDate = DateTime.fromISO(newDate, { zone: 'Australia/Sydney' });
   
   return {
     subject: 'Reschedule Request Received - Ami Photography',
@@ -765,7 +785,7 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
         
         <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
           
-          <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
+          <p style="color: #333; font-size: 16px;">Hi ${escapeHtml(booking.clientName)},</p>
           
           <p style="color: #555; line-height: 1.6;">
             Thank you for submitting your reschedule request. We've received your request and will confirm your new date within 24 hours.
@@ -774,21 +794,21 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
           <div style="background: white; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #e0e0e0;">
             <h3 style="color: #667eea; margin-top: 0;">Current Booking Details</h3>
             <p style="margin: 10px 0; color: #555;">
-              <strong>Current Date:</strong> ${eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
-              <strong>Current Time:</strong> ${booking.startTime}<br>
-              <strong>Location:</strong> ${booking.location}<br>
-              <strong>Package:</strong> ${booking.package}
+              <strong>Current Date:</strong> ${eventDate.toFormat('EEEE, MMMM d, yyyy')}<br>
+              <strong>Current Time:</strong> ${escapeHtml(booking.startTime)}<br>
+              <strong>Location:</strong> ${escapeHtml(booking.location)}<br>
+              <strong>Package:</strong> ${escapeHtml(booking.package)}
             </p>
             
             <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
             
             <h3 style="color: #667eea; margin-top: 0;">Your Requested New Date</h3>
             <p style="margin: 10px 0; color: #555;">
-              <strong>Requested Date:</strong> ${new Date(newDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
-              <strong>Requested Time:</strong> ${newTime}
+              <strong>Requested Date:</strong> ${requestedDate.toFormat('EEEE, MMMM d, yyyy')}<br>
+              <strong>Requested Time:</strong> ${escapeHtml(newTime)}
             </p>
             
-            ${reason ? `<p style="margin: 15px 0; color: #666;"><strong>Reason:</strong> ${reason}</p>` : ''}
+            ${reason ? `<p style="margin: 15px 0; color: #666;"><strong>Reason:</strong> ${escapeHtml(reason)}</p>` : ''}
           </div>
           
           <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; border-radius: 4px; margin: 20px 0;">
@@ -824,7 +844,7 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
         
         <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
           
-          <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
+          <p style="color: #333; font-size: 16px;">Hi ${escapeHtml(booking.clientName)},</p>
           
           <p style="color: #555; line-height: 1.6;">
             Your photography booking has been successfully cancelled. We're sorry to see you go, but we understand things come up. 
@@ -835,16 +855,16 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
             <table style="width: 100%; border-collapse: collapse;">
               <tr style="border-bottom: 1px solid #e0e0e0;">
                 <td style="padding: 12px 0; color: #666;"><strong>Original Amount Paid:</strong></td>
-                <td style="text-align: right; padding: 12px 0; color: #333; font-weight: 600;">${booking.packageCurrency || '$'}${amount}</td>
+                <td style="text-align: right; padding: 12px 0; color: #333; font-weight: 600;">${escapeHtml(booking.packageCurrency || '$')}${amount}</td>
               </tr>
               <tr style="border-bottom: 1px solid #e0e0e0;">
                 <td style="padding: 12px 0; color: #666;"><strong>Cancellation Reason:</strong></td>
-                <td style="text-align: right; padding: 12px 0; color: #333;">${refundReason}</td>
+                <td style="text-align: right; padding: 12px 0; color: #333;">${escapeHtml(refundReason)}</td>
               </tr>
               <tr>
                 <td style="padding: 15px 0; color: #667eea; font-size: 16px;"><strong>Refund Amount:</strong></td>
                 <td style="text-align: right; padding: 15px 0; background-color: #e8f5e9; border-radius: 4px; padding-right: 10px; font-weight: 700; color: #2e7d32; font-size: 18px;">
-                  ${booking.packageCurrency || '$'}${refund}
+                  ${escapeHtml(booking.packageCurrency || '$')}${refund}
                 </td>
               </tr>
             </table>
@@ -852,7 +872,7 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
           
           <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
             <p style="margin: 0; color: #1565c0; font-size: 14px;">
-              <strong>✓ Refund Processing:</strong> Your refund of ${booking.packageCurrency || '$'}${refund} will be processed to your original payment method within 5-7 business days.
+              <strong>✓ Refund Processing:</strong> Your refund of ${escapeHtml(booking.packageCurrency || '$')}${refund} will be processed to your original payment method within 5-7 business days.
             </p>
           </div>
           
@@ -980,18 +1000,20 @@ app.post('/api/customer/cancel', async (req, res) => {
 
 // Contact form email template
 const getContactEmailTemplate = (name, formData) => {
+  const submittedAt = DateTime.now().setZone('Australia/Sydney').toFormat('MMMM d, yyyy');
+  
   return {
     subject: 'Thank you for contacting Ami Photography!',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Hi ${name},</h2>
+        <h2 style="color: #333;">Hi ${escapeHtml(name)},</h2>
         <p>Thank you for reaching out to Ami Photography! We've received your inquiry and are excited to potentially work with you.</p>
         
         <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
           <h3>Your Message Details:</h3>
-          <p><strong>Subject:</strong> ${formData.subject}</p>
-          <p><strong>Message:</strong> ${formData.message}</p>
-          <p><strong>Submitted:</strong> ${new Date().toLocaleDateString()}</p>
+          <p><strong>Subject:</strong> ${escapeHtml(formData.subject)}</p>
+          <p><strong>Message:</strong> ${escapeHtml(formData.message)}</p>
+          <p><strong>Submitted:</strong> ${submittedAt}</p>
         </div>
         
         <p>We'll get back to you within 24-48 hours with a detailed response.</p>
