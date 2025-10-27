@@ -397,34 +397,106 @@ app.post('/api/create-checkout-session', csrfProtection, async (req, res) => {
 
 app.get('/api/availability', async (req, res) => {
   try {
-    const { start, end, date } = req.query;
+    const { date, start, end } = req.query || {};
+    console.log('[API] /api/availability endpoint called', { date, start, end, timestamp: new Date().toISOString() });
 
-    console.log('[API] /api/availability called', { start, end, date, timestamp: new Date().toISOString() });
+    // Fetch booked slots from database (confirmed or pending)
+    console.log('[API] Fetching booked slots from database...');
+    const bookedSlots = await Booking.find({
+      status: { $in: ['confirmed', 'pending'] }
+    }).select('eventDate startTime').lean();
+    console.log(`[API] Found ${bookedSlots.length} booked slot(s) in database`);
 
-    // If date is provided, get availability for that specific date
+    const bookedSet = new Set();
+    bookedSlots.forEach((booking) => {
+      if (booking.eventDate && booking.startTime) {
+        const eventDateStr = booking.eventDate.toISOString().split('T')[0];
+        bookedSet.add(`${eventDateStr}:${booking.startTime}`);
+      }
+    });
+
     if (date) {
-      console.log(`[Zoho] Fetching availability for date: ${date}`);
-      const availability = await getAvailabilityForDate(date);
-      console.log(`[Zoho] Got ${availability.length} slot(s) for ${date}`);
-      return res.json(availability);
+      console.log(`[API] Requesting availability for single date: ${date}`);
+      const slots = await getAvailabilityForDate(date);
+      const filteredSlots = slots.filter((slot) => !bookedSet.has(`${date}:${slot}`));
+      console.log(`[API] Returning ${filteredSlots.length} available slot(s) for ${date} (${slots.length - filteredSlots.length} filtered by bookings)`);
+      return res.json({
+        date,
+        slots: filteredSlots,
+        slotMinutes: zohoSettings.slotMinutes
+      });
     }
 
-    // If start and end are provided, get range
     if (start && end) {
-      console.log(`[Zoho] Fetching availability range: ${start} to ${end}`);
-      const availability = await getAvailabilityForRange(start, end);
-      const totalDays = Object.keys(availability).length;
-      const totalSlots = Object.values(availability).reduce((sum, slots) => sum + slots.length, 0);
-      console.log(`[Zoho] Got availability for ${totalDays} day(s) with ${totalSlots} total slot(s)`);
-      return res.json(availability);
+      console.log(`[API] Requesting availability for date range: ${start} to ${end}`);
+      const days = await getAvailabilityForRange(start, end);
+      const filteredDays = {};
+      let totalSlots = 0;
+      let totalFiltered = 0;
+
+      Object.entries(days).forEach(([dayDate, daySlots]) => {
+        const filtered = daySlots.filter((slot) => !bookedSet.has(`${dayDate}:${slot}`));
+        filteredDays[dayDate] = filtered;
+        totalSlots += daySlots.length;
+        totalFiltered += filtered.length;
+      });
+
+      console.log(`[API] Returning ${totalFiltered} available slot(s) across ${Object.keys(filteredDays).length} day(s) (${totalSlots - totalFiltered} filtered by bookings)`);
+      return res.json({
+        days: filteredDays,
+        slotMinutes: zohoSettings.slotMinutes
+      });
     }
 
-    // Default: return empty if no parameters
-    console.warn('[API] No date or date range provided to /api/availability');
-    res.json({ availability: [] });
+    console.warn('[API] No date or date range provided');
+    return res.status(400).json({ error: 'Please provide a date or range to check availability.' });
   } catch (error) {
-    console.error('[API] Error fetching availability:', error.message, error.stack);
-    res.status(500).json({ error: 'Unable to load availability', details: error.message });
+    console.error('[API] Availability fetch error:', error.message, error.stack);
+    try {
+      const fallbackConfig = {
+        timezone: zohoSettings.calendarTimezone || 'Australia/Sydney',
+        startHour: zohoSettings.operatingStartHour || 10,
+        endHour: zohoSettings.operatingEndHour || 16,
+        slotMinutes: zohoSettings.slotMinutes || 5
+      };
+
+      if (date) {
+        const { slots } = buildSlotsForDay(date, fallbackConfig);
+        return res.json({
+          date,
+          slots: slots.map((slot) => slot.label),
+          slotMinutes: fallbackConfig.slotMinutes,
+          fallback: true
+        });
+      }
+
+      if (start && end) {
+        const startDate = DateTime.fromISO(start, { zone: fallbackConfig.timezone }).startOf('day');
+        const endDate = DateTime.fromISO(end, { zone: fallbackConfig.timezone }).startOf('day');
+        const days = {};
+
+        if (!startDate.isValid || !endDate.isValid) {
+          throw new Error('Invalid fallback range provided.');
+        }
+
+        let cursor = startDate;
+        while (cursor <= endDate) {
+          const { slots } = buildSlotsForDay(cursor.toISODate(), fallbackConfig);
+          days[cursor.toISODate()] = slots.map((slot) => slot.label);
+          cursor = cursor.plus({ days: 1 });
+        }
+
+        return res.json({
+          days,
+          slotMinutes: fallbackConfig.slotMinutes,
+          fallback: true
+        });
+      }
+    } catch (fallbackError) {
+      console.error('Availability fallback error:', fallbackError);
+    }
+
+    res.status(500).json({ error: 'Unable to load availability. Please try again.' });
   }
 });
 
