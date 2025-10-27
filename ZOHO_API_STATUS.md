@@ -9,22 +9,25 @@ The Zoho API integration is functioning correctly. All components are properly c
 ## Test Results Summary
 
 ### 1. **OAuth Configuration** ✅
+
 - **Status**: All credentials configured
 - Client ID: Configured
 - Client Secret: Configured
 - Refresh Token: Configured
-- **Accounts URL**: https://accounts.zoho.com.au
-- **Calendar URL**: https://calendar.zoho.com.au
+- **Accounts URL**: <https://accounts.zoho.com.au>
+- **Calendar URL**: <https://calendar.zoho.com.au>
 
 ### 2. **Token Refresh** ✅
+
 - **Status**: 200 OK
 - **Result**: Access token successfully refreshed
 - **Expiration**: 3600 seconds (1 hour)
 - Fresh token obtained: `1000.8d9fdf8316e1edd...`
 
 ### 3. **Free/Busy API** ✅
+
 - **Status**: 200 OK
-- **User**: notification@southsydney.net
+- **User**: <notification@southsydney.net>
 - **Calendar**: 83ce9529c56a45f8b2b0375e74acc648
 - **Data Retrieved**: 8 days of availability (Oct 27 - Nov 3, 2025)
 - **Timezone**: Australia/Sydney
@@ -48,33 +51,39 @@ The Zoho API integration is functioning correctly. All components are properly c
 3. **Frontend** displays filtered availability to customers
 
 ### Current Configuration
+
 - **Slot Duration**: 5 minutes
 - **Operating Hours**: 10 AM - 4 PM
 - **Timezone**: Australia/Sydney
-- **Calendar User**: notification@southsydney.net
+- **Calendar User**: <notification@southsydney.net>
 
 ---
 
 ## Possible Issues (If Not Seeing Availability)
 
 ### 1. **No Bookings in Database**
+
 If no bookings exist, the system may appear to have no availability slots. This is usually a fallback to hardcoded slots.
 
 **Solution**: Check database for sample bookings or adjust fallback logic.
 
 ### 2. **Calendar User Has All-Day Blocks**
+
 If `notification@southsydney.net` has all-day calendar blocks, no slots will show available.
 
-**Solution**: 
+**Solution**:
+
 - Check Zoho Calendar for the user
 - Clear or modify all-day events that shouldn't block bookings
 
 ### 3. **Time Zone Mismatch**
+
 If the calendar user's timezone differs from Australia/Sydney, times may not align.
 
 **Solution**: Verify timezone in Zoho Calendar settings matches `ZOHO_TIMEZONE`
 
 ### 4. **Refresh Token Expired**
+
 Zoho refresh tokens can expire if not used for 6 months.
 
 **Solution**: Re-authorize in Zoho and generate new refresh token
@@ -128,6 +137,7 @@ node test_zoho_api.js
 ## Troubleshooting Commands
 
 ### Check if token refresh works
+
 ```bash
 curl -X POST "https://accounts.zoho.com.au/oauth/v2/token" \
   -d "refresh_token=$ZOHO_OAUTH_REFRESH_TOKEN" \
@@ -137,9 +147,11 @@ curl -X POST "https://accounts.zoho.com.au/oauth/v2/token" \
 ```
 
 ### Check calendar events in Zoho
-Visit: https://calendar.zoho.com.au
+
+Visit: <https://calendar.zoho.com.au>
 
 ### Monitor real-time server logs
+
 ```bash
 npm run dev:backend
 ```
