@@ -189,7 +189,7 @@ async function fetchFreeBusy(rangeStart, rangeEnd) {
   }
 
   // Mask email for logging (show first 3 chars and domain only)
-  const maskedEmail = freeBusyUser ? 
+  const maskedEmail = freeBusyUser && freeBusyUser.includes('@') ? 
     freeBusyUser.substring(0, 3) + '***@' + freeBusyUser.split('@')[1] : 
     'not-configured';
   console.log(`[Zoho] Fetching free/busy data for ${maskedEmail} from ${rangeStart.toISO()} to ${rangeEnd.toISO()}`);
@@ -201,7 +201,8 @@ async function fetchFreeBusy(rangeStart, rangeEnd) {
   url.searchParams.set('edate', rangeEnd.toFormat("yyyyMMdd'T'HHmmss"));
   url.searchParams.set('ftype', 'timebased');
 
-  console.log(`[Zoho] API Request: ${url.toString()}`);
+  // Log URL without query parameters to avoid exposing email
+  console.log(`[Zoho] API Request: ${url.origin}${url.pathname} (with query parameters)`);
 
   const response = await fetch(url, {
     headers: {
@@ -291,7 +292,8 @@ async function createZohoEvent({ date, time, durationMinutes = slotMinutes, summ
 
   // Add eventdata as URL query parameter
   url.searchParams.set('eventdata', JSON.stringify(eventdata));
-  console.log(`[Zoho] API Request: POST ${url.toString()}`);
+  // Log without query parameters to avoid exposing event details in logs
+  console.log(`[Zoho] API Request: POST ${url.origin}${url.pathname} (with event data)`);
 
   const response = await fetch(url, {
     method: 'POST',
