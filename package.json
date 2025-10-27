@@ -22,7 +22,7 @@
   "author": "Your Name",
   "license": "ISC",
   "engines": {
-    "node": ">=22.21.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
