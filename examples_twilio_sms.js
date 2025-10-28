@@ -46,7 +46,7 @@ async function example2_BookingConfirmation() {
     clientPhone: '+61412345678',
     eventDate: new Date('2025-12-15'),
     startTime: '14:00',
-    package: 'Santa\'s Gift Pack',
+    package: `Santa's Gift Pack`,
     location: 'Westfield Shopping Centre'
   };
 
@@ -164,7 +164,7 @@ async function example6_ErrorHandling() {
     clientEmail: 'sarah@example.com',
     eventDate: new Date('2025-12-15'),
     startTime: '14:00',
-    package: 'Santa\'s Gift Pack',
+    package: `Santa's Gift Pack`,
     location: 'Westfield Shopping Centre'
   };
 
@@ -224,7 +224,7 @@ async function example8_CustomerPreference() {
     smsNotificationsEnabled: true, // Customer preference from database
     eventDate: new Date('2025-12-15'),
     startTime: '14:00',
-    package: 'Santa\'s Gift Pack',
+    package: `Santa's Gift Pack`,
     location: 'Westfield Shopping Centre'
   };
 

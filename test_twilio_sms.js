@@ -89,7 +89,7 @@ async function runTests() {
     clientPhone: TEST_PHONE,
     eventDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
     startTime: '14:00',
-    package: 'Santa\'s Gift Pack',
+    package: `Santa's Gift Pack`,
     location: 'Westfield Shopping Centre'
   };
 
