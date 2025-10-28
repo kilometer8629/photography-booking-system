@@ -76,12 +76,8 @@ function formatPhoneNumber(phone) {
     digits = '61' + digits.substring(1); // Australian country code
   }
 
-  // If doesn't start with '+', add it
-  if (!phone.startsWith('+')) {
-    return '+' + digits;
-  }
-
-  return phone;
+  // Always format with + prefix
+  return '+' + digits;
 }
 
 /**
@@ -164,7 +160,10 @@ async function sendRescheduleConfirmationSMS(booking, newDate, newTime) {
  */
 async function sendPaymentConfirmationSMS(booking) {
   const phoneNumber = formatPhoneNumber(booking.clientPhone);
-  const amount = (booking.packageAmount / 100 || booking.estimatedCost || 0).toFixed(2);
+  // packageAmount is in cents, estimatedCost is in dollars
+  const amount = booking.packageAmount 
+    ? (booking.packageAmount / 100).toFixed(2)
+    : (booking.estimatedCost || 0).toFixed(2);
   const eventDate = new Date(booking.eventDate).toLocaleDateString('en-AU', {
     weekday: 'long',
     year: 'numeric',
