@@ -24,8 +24,13 @@ async function runTests() {
   console.log('Test 1: Checking Twilio Configuration...');
   if (isTwilioConfigured()) {
     console.log('✅ Twilio is properly configured');
-    console.log(`   Phone Number: ${process.env.TWILIO_PHONE_NUMBER}`);
-    console.log(`   Account SID: ${process.env.TWILIO_ACCOUNT_SID?.substring(0, 10)}...`);
+    // Mask phone number for security (show last 4 digits only)
+    const phoneNumber = process.env.TWILIO_PHONE_NUMBER || '';
+    const maskedPhone = phoneNumber.slice(0, -4).replace(/\d/g, '*') + phoneNumber.slice(-4);
+    console.log(`   Phone Number: ${maskedPhone}`);
+    // Mask Account SID (show first 10 characters only)
+    const accountSid = process.env.TWILIO_ACCOUNT_SID || '';
+    console.log(`   Account SID: ${accountSid.substring(0, 10)}...`);
   } else {
     console.log('❌ Twilio is NOT configured');
     console.log('   Please set the following environment variables:');
@@ -61,7 +66,9 @@ async function runTests() {
 
   // Ask for confirmation before sending test SMS
   console.log('⚠️  About to send test SMS messages.');
-  console.log(`   Recipient: ${TEST_PHONE}`);
+  // Mask test phone number for security
+  const maskedTestPhone = TEST_PHONE.slice(0, -4).replace(/\d/g, '*') + TEST_PHONE.slice(-4);
+  console.log(`   Recipient: ${maskedTestPhone}`);
   console.log('   Note: This will use your Twilio credits.\n');
 
   // Test 3: Basic SMS

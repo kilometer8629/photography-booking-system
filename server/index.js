@@ -32,6 +32,12 @@ const {
   isTwilioConfigured
 } = require('./services/twilioClient');
 
+// Utility function to mask phone numbers in logs for security
+const maskPhoneNumber = (phone) => {
+  if (!phone || phone.length < 4) return '***';
+  return phone.slice(0, -4).replace(/\d/g, '*') + phone.slice(-4);
+};
+
 // ===== Import Models =====
 const { Booking, Message, Admin } = require('./models');
 
@@ -352,7 +358,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
         if (booking.clientPhone && isTwilioConfigured()) {
           const smsResult = await sendPaymentConfirmationSMS(booking);
           if (smsResult.success) {
-            console.log(`✅ Payment confirmation SMS sent to ${booking.clientPhone}`);
+            console.log(`✅ Payment confirmation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
           } else {
             console.warn(`⚠️ Failed to send payment confirmation SMS: ${smsResult.error}`);
           }
@@ -900,7 +906,7 @@ app.post('/api/customer/reschedule', async (req, res) => {
     if (booking.clientPhone && isTwilioConfigured()) {
       const smsResult = await sendRescheduleNotificationSMS(booking, newDate, newTime);
       if (smsResult.success) {
-        console.log(`✅ Reschedule SMS sent to ${booking.clientPhone}`);
+        console.log(`✅ Reschedule SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
       } else {
         console.warn(`⚠️ Failed to send reschedule SMS: ${smsResult.error}`);
       }
@@ -968,7 +974,7 @@ app.post('/api/customer/cancel', async (req, res) => {
     if (booking.clientPhone && isTwilioConfigured()) {
       const smsResult = await sendCancellationSMS(booking, refundAmount);
       if (smsResult.success) {
-        console.log(`✅ Cancellation SMS sent to ${booking.clientPhone}`);
+        console.log(`✅ Cancellation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
       } else {
         console.warn(`⚠️ Failed to send cancellation SMS: ${smsResult.error}`);
       }
