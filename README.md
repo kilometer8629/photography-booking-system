@@ -20,6 +20,7 @@ A professional photography portfolio and booking website built with Node.js, Exp
 - **Booking Management**: View, confirm, cancel, and export booking requests
 - **Message System**: Handle client inquiries with read/unread status
 - **Email Notifications**: Automated confirmation emails via Nodemailer
+- **SMS Notifications**: Twilio integration for booking confirmations, reminders, and updates
 - **Customer Self-Service**: Clients can reschedule or cancel bookings via manage-booking.html
 - **Refund System**: Automatic refund calculations based on cancellation policy
 - **Stripe Integration**: Payment processing, webhook handling, and session management
@@ -34,6 +35,8 @@ A professional photography portfolio and booking website built with Node.js, Exp
 - **Database**: MongoDB with Mongoose ODM
 - **Security**: Helmet, CSRF tokens, Rate limiting
 - **Email**: Nodemailer with Gmail/SMTP support
+- **SMS**: Twilio for text message notifications
+- **Payment**: Stripe for secure payment processing
 - **Development**: Vite for frontend development server
 - **Session Management**: Express-session with MongoDB store
 
@@ -183,6 +186,11 @@ EMAIL_PASS=your-app-password
 EMAIL_FROM="Ami Photography" <noreply@amiphotography.com>
 CONTACT_EMAIL=contact@amiphotography.com
 
+# SMS Notifications (Twilio)
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=+1234567890
+
 # Session & Cookies
 SESSION_NAME=amiphotography.sid
 COOKIE_DOMAIN=localhost
@@ -197,16 +205,47 @@ COOKIE_DOMAIN=localhost
    - Generate password for "Mail"
 3. Use the generated password in `EMAIL_PASS`
 
+### SMS Setup (Twilio)
+
+1. **Sign up for Twilio**:
+   - Create account at [Twilio](https://www.twilio.com/try-twilio)
+   - Get $15 free trial credits
+
+2. **Get a phone number**:
+   - Navigate to Phone Numbers → Buy a number
+   - Select a number that supports SMS
+   - Note the number in E.164 format (e.g., +61412345678)
+
+3. **Get your credentials**:
+   - From Twilio Console dashboard
+   - Copy Account SID (starts with "AC...")
+   - Copy Auth Token (click "Show" to reveal)
+
+4. **Configure environment variables**:
+   ```env
+   TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   TWILIO_AUTH_TOKEN=your_auth_token_here
+   TWILIO_PHONE_NUMBER=+61412345678
+   ```
+
+5. **Test your setup**:
+   ```bash
+   node test_twilio_sms.js
+   ```
+
+For detailed setup instructions, see [TWILIO_SMS_SETUP.md](./TWILIO_SMS_SETUP.md).
+
 ## 📱 Usage
 
 ### For Clients
 1. **Browse Portfolio**: View categorized photography work
 2. **Book Sessions**: Fill out detailed booking form
 3. **Contact**: Send inquiries via contact form
-4. **Receive Confirmations**: Automatic email confirmations
+4. **Receive Confirmations**: Automatic email and SMS confirmations
 5. **Pay with Stripe**: Secure payment processing
 6. **Receive Tax Receipt**: Professional tax receipt emailed after payment
-7. **Manage Booking**: View, reschedule, or cancel booking via customer portal at `/manage-booking.html`
+7. **SMS Notifications**: Text message updates for bookings, payments, and reminders
+8. **Manage Booking**: View, reschedule, or cancel booking via customer portal at `/manage-booking.html`
    - Search booking by email address
    - View booking details
    - Request reschedule with new date/time
