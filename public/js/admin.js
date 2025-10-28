@@ -20,10 +20,18 @@ const state = {
         error: null,
         unread: 0
     },
+    sms: {
+        data: [],
+        filter: 'all',
+        loading: false,
+        error: null,
+        configured: false
+    },
     sessionTimer: null,
     sessionWarningTimer: null,
     sessionTimerExpiresAt: null,
-    timerIntervalId: null
+    timerIntervalId: null,
+    currentBookingId: null
 };
 
 // ===== DOM Elements =====
@@ -134,6 +142,7 @@ async function initializeAdmin() {
             sectionContainers: {
                 bookings: safeGetElement('bookings-section'),
                 messages: safeGetElement('messages-section'),
+                sms: safeGetElement('sms-section'),
             },
             bookingsList: safeGetElement('bookings-list'),
             bookingsEmpty: safeGetElement('bookings-empty'),
@@ -497,6 +506,12 @@ async function loadSectionData(sectionId) {
 
             const data = await response.json();
             state.messages.data = data;
+        }
+
+        if (sectionId === 'sms') {
+            await checkSMSConfig();
+            await loadSMSMessages(state.sms.filter);
+            return; // Early return as loadSMSMessages handles its own UI updates
         }
 
     } catch (error) {
@@ -1254,6 +1269,9 @@ function showBookingModal(booking) {
             <button type="button" class="btn btn-info refresh-booking-btn" title="Refresh from server">
                 <i class="fas fa-sync-alt"></i> Refresh
             </button>
+            <button type="button" class="btn btn-success send-sms-btn" title="Send SMS to customer">
+                <i class="fas fa-sms"></i> Send SMS
+            </button>
             <button type="button" class="btn btn-danger cancel-booking-btn">
                 <i class="fas fa-times-circle"></i> Cancel Booking
             </button>
@@ -1276,6 +1294,9 @@ function showBookingModal(booking) {
         footer: footer
     });
     
+    // Store current booking ID for SMS functionality
+    state.currentBookingId = booking.id || booking._id;
+    
     // Add confirm booking handler if button exists
     const confirmBtn = modal.querySelector('.confirm-booking-btn');
     if (confirmBtn) {
@@ -1293,6 +1314,19 @@ function showBookingModal(booking) {
             if (confirm('Are you sure you want to cancel this booking? This action cannot be undone.')) {
                 cancelBooking(booking.id);
             }
+        });
+    }
+    
+    // Add send SMS button handler if button exists
+    const sendSMSBtn = modal.querySelector('.send-sms-btn');
+    if (sendSMSBtn) {
+        sendSMSBtn.addEventListener('click', () => {
+            // Close booking modal
+            const modalBackdrop = document.querySelector('.modal-backdrop');
+            if (modalBackdrop) modalBackdrop.remove();
+            
+            // Open SMS modal with booking pre-selected
+            openSMSModal(state.currentBookingId);
         });
     }
     
@@ -1821,7 +1855,7 @@ function setupEventListeners() {
         // Alt + 1, 2, etc. to switch sections
         if (e.altKey && e.key >= '1' && e.key <= '9') {
             e.preventDefault();
-            const sections = ['bookings', 'messages'];
+            const sections = ['bookings', 'messages', 'sms'];
             const index = parseInt(e.key) - 1;
             if (sections[index]) {
                 showSection(sections[index]);
@@ -1833,6 +1867,352 @@ function setupEventListeners() {
     document.addEventListener('mousemove', resetSessionTimer);
     document.addEventListener('keypress', resetSessionTimer);
     document.addEventListener('click', resetSessionTimer);
+    
+    // Setup SMS event listeners
+    setupSMSEventListeners();
+}
+
+// ===== SMS Management Functions =====
+
+async function checkSMSConfig() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/sms/config-status`);
+        const data = await response.json();
+        state.sms.configured = data.configured;
+        
+        const warningEl = safeGetElement('sms-config-warning');
+        if (warningEl) {
+            warningEl.classList.toggle('hidden', data.configured);
+        }
+        
+        return data.configured;
+    } catch (error) {
+        console.error('Failed to check SMS config:', error);
+        return false;
+    }
+}
+
+async function loadSMSMessages(filter = 'all') {
+    state.sms.loading = true;
+    state.sms.error = null;
+    
+    const smsList = safeGetElement('sms-list');
+    const smsEmpty = safeGetElement('sms-empty');
+    const smsError = safeGetElement('sms-error');
+    const smsTable = safeGetElement('sms-table');
+    
+    if (!smsList) return;
+    
+    try {
+        const queryParams = filter !== 'all' ? `?status=${filter}` : '';
+        const response = await fetch(`${API_BASE_URL}/sms${queryParams}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load SMS messages');
+        }
+        
+        const smsMessages = await response.json();
+        state.sms.data = smsMessages;
+        state.sms.filter = filter;
+        
+        if (smsMessages.length === 0) {
+            if (smsTable) smsTable.classList.add('hidden');
+            if (smsEmpty) smsEmpty.classList.remove('hidden');
+            if (smsError) smsError.classList.add('hidden');
+        } else {
+            if (smsTable) smsTable.classList.remove('hidden');
+            if (smsEmpty) smsEmpty.classList.add('hidden');
+            if (smsError) smsError.classList.add('hidden');
+            
+            renderSMSMessages(smsMessages);
+        }
+    } catch (error) {
+        console.error('Error loading SMS messages:', error);
+        state.sms.error = error.message;
+        
+        if (smsTable) smsTable.classList.add('hidden');
+        if (smsEmpty) smsEmpty.classList.add('hidden');
+        if (smsError) smsError.classList.remove('hidden');
+    } finally {
+        state.sms.loading = false;
+    }
+}
+
+function renderSMSMessages(smsMessages) {
+    const smsList = safeGetElement('sms-list');
+    if (!smsList) return;
+    
+    smsList.innerHTML = smsMessages.map(sms => {
+        const sentAt = sms.sentAt ? new Date(sms.sentAt).toLocaleString() : '-';
+        const messagePreview = sms.message.length > 50 ? sms.message.substring(0, 50) + '...' : sms.message;
+        
+        return `
+            <tr class="sms-row ${sms.status}">
+                <td>${sms.recipientName || 'Unknown'}</td>
+                <td>${sms.phoneNumber}</td>
+                <td title="${sms.message}">${messagePreview}</td>
+                <td><span class="badge badge-${sms.messageType}">${sms.messageType}</span></td>
+                <td><span class="status-badge ${sms.status}">${sms.status}</span></td>
+                <td>${sentAt}</td>
+                <td class="actions-cell">
+                    <button class="btn btn-sm btn-view" data-id="${sms.id || sms._id}" onclick="viewSMSDetails('${sms.id || sms._id}')">
+                        <i class="fas fa-eye"></i> View
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function viewSMSDetails(smsId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/sms/${smsId}`);
+        if (!response.ok) throw new Error('Failed to load SMS details');
+        
+        const sms = await response.json();
+        
+        showNotification(`SMS Details:\n\nTo: ${sms.phoneNumber}\nRecipient: ${sms.recipientName}\nType: ${sms.messageType}\nStatus: ${sms.status}\n\nMessage:\n${sms.message}`, 'info');
+    } catch (error) {
+        showNotification('Failed to load SMS details', 'error');
+    }
+}
+
+function openSMSModal(bookingId = null) {
+    const modal = safeGetElement('sms-modal');
+    if (!modal) return;
+    
+    modal.classList.remove('hidden');
+    
+    // Reset form
+    const form = safeGetElement('sms-form');
+    if (form) form.reset();
+    
+    // Load bookings into dropdown
+    loadBookingsForSMS();
+    
+    // If bookingId provided, pre-select it
+    if (bookingId) {
+        setTimeout(() => {
+            const select = safeGetElement('sms-booking-select');
+            if (select) select.value = bookingId;
+            handleBookingSelection(bookingId);
+        }, 100);
+    }
+}
+
+async function loadBookingsForSMS() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/bookings?status=confirmed`);
+        if (!response.ok) return;
+        
+        const bookings = await response.json();
+        const select = safeGetElement('sms-booking-select');
+        if (!select) return;
+        
+        const options = bookings.map(booking => {
+            const date = new Date(booking.eventDate).toLocaleDateString();
+            return `<option value="${booking._id}">${booking.clientName} - ${date} ${booking.startTime}</option>`;
+        }).join('');
+        
+        select.innerHTML = '<option value="">Select a booking (or send custom SMS)</option>' + options;
+    } catch (error) {
+        console.error('Failed to load bookings for SMS:', error);
+    }
+}
+
+async function handleBookingSelection(bookingId) {
+    if (!bookingId) {
+        // Clear fields
+        const nameField = safeGetElement('sms-recipient-name');
+        const phoneField = safeGetElement('sms-phone');
+        if (nameField) nameField.value = '';
+        if (phoneField) phoneField.value = '';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}`);
+        if (!response.ok) return;
+        
+        const booking = await response.json();
+        
+        const nameField = safeGetElement('sms-recipient-name');
+        const phoneField = safeGetElement('sms-phone');
+        
+        if (nameField) nameField.value = booking.clientName;
+        if (phoneField) phoneField.value = booking.clientPhone;
+        
+        state.currentBookingId = bookingId;
+    } catch (error) {
+        console.error('Failed to load booking details:', error);
+    }
+}
+
+function updateSMSPreview() {
+    const template = safeGetElement('sms-template');
+    const message = safeGetElement('sms-message');
+    const preview = safeGetElement('sms-preview');
+    const previewText = safeGetElement('sms-preview-text');
+    
+    if (!template || !message || !preview || !previewText) return;
+    
+    const selectedTemplate = template.value;
+    
+    // Show/hide template fields
+    const delayField = document.getElementById('delay-field');
+    const newDateField = document.getElementById('new-date-field');
+    const newTimeField = document.getElementById('new-time-field');
+    
+    if (delayField) delayField.style.display = selectedTemplate === 'running_late' ? 'block' : 'none';
+    if (newDateField) newDateField.style.display = selectedTemplate === 'rescheduled' ? 'block' : 'none';
+    if (newTimeField) newTimeField.style.display = selectedTemplate === 'rescheduled' ? 'block' : 'none';
+    
+    if (message.value) {
+        preview.classList.remove('hidden');
+        previewText.textContent = message.value;
+    } else {
+        preview.classList.add('hidden');
+    }
+}
+
+async function sendSMSMessage(formData) {
+    try {
+        const csrfToken = await getCSRFToken();
+        
+        const response = await fetch(`${API_BASE_URL}/sms/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to send SMS');
+        }
+        
+        showNotification('SMS sent successfully!', 'success');
+        
+        // Close modal and refresh SMS list
+        const modal = safeGetElement('sms-modal');
+        if (modal) modal.classList.add('hidden');
+        
+        if (state.currentSection === 'sms') {
+            loadSMSMessages(state.sms.filter);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('Error sending SMS:', error);
+        showNotification(error.message || 'Failed to send SMS', 'error');
+        throw error;
+    }
+}
+
+function setupSMSEventListeners() {
+    // Send new SMS button
+    const sendNewSMSBtn = safeGetElement('send-new-sms');
+    if (sendNewSMSBtn) {
+        sendNewSMSBtn.addEventListener('click', () => openSMSModal());
+    }
+    
+    // Refresh SMS button
+    const refreshSMSBtn = safeGetElement('refresh-sms');
+    if (refreshSMSBtn) {
+        refreshSMSBtn.addEventListener('click', () => loadSMSMessages(state.sms.filter));
+    }
+    
+    // SMS filter
+    const smsFilter = safeGetElement('sms-filter');
+    if (smsFilter) {
+        smsFilter.addEventListener('change', (e) => loadSMSMessages(e.target.value));
+    }
+    
+    // Retry SMS button
+    const retrySMSBtn = safeGetElement('retry-sms');
+    if (retrySMSBtn) {
+        retrySMSBtn.addEventListener('click', () => loadSMSMessages(state.sms.filter));
+    }
+    
+    // Close SMS modal buttons
+    const closeSMSModalBtn = safeGetElement('close-sms-modal');
+    const cancelSMSBtn = safeGetElement('cancel-sms-btn');
+    const smsModal = safeGetElement('sms-modal');
+    
+    if (closeSMSModalBtn && smsModal) {
+        closeSMSModalBtn.addEventListener('click', () => smsModal.classList.add('hidden'));
+    }
+    if (cancelSMSBtn && smsModal) {
+        cancelSMSBtn.addEventListener('click', () => smsModal.classList.add('hidden'));
+    }
+    
+    // SMS booking select
+    const smsBookingSelect = safeGetElement('sms-booking-select');
+    if (smsBookingSelect) {
+        smsBookingSelect.addEventListener('change', (e) => handleBookingSelection(e.target.value));
+    }
+    
+    // SMS template select
+    const smsTemplate = safeGetElement('sms-template');
+    if (smsTemplate) {
+        smsTemplate.addEventListener('change', updateSMSPreview);
+    }
+    
+    // SMS message textarea - character counter
+    const smsMessage = safeGetElement('sms-message');
+    const charCount = safeGetElement('char-count');
+    if (smsMessage && charCount) {
+        smsMessage.addEventListener('input', () => {
+            charCount.textContent = `${smsMessage.value.length}/1600`;
+            updateSMSPreview();
+        });
+    }
+    
+    // SMS form submit
+    const smsForm = safeGetElement('sms-form');
+    if (smsForm) {
+        smsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                bookingId: safeGetElement('sms-booking-select')?.value || null,
+                phoneNumber: safeGetElement('sms-phone')?.value,
+                recipientName: safeGetElement('sms-recipient-name')?.value,
+                message: safeGetElement('sms-message')?.value,
+                messageType: safeGetElement('sms-template')?.value
+            };
+            
+            const sendBtn = safeGetElement('send-sms-btn');
+            if (sendBtn) {
+                sendBtn.disabled = true;
+                sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            }
+            
+            try {
+                await sendSMSMessage(formData);
+            } finally {
+                if (sendBtn) {
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send SMS';
+                }
+            }
+        });
+    }
+    
+    // Send SMS to customer button (in booking modal)
+    const sendSMSToCustomerBtn = safeGetElement('send-sms-to-customer-btn');
+    if (sendSMSToCustomerBtn) {
+        sendSMSToCustomerBtn.addEventListener('click', () => {
+            if (state.currentBookingId) {
+                const bookingModal = safeGetElement('booking-modal');
+                if (bookingModal) bookingModal.classList.add('hidden');
+                openSMSModal(state.currentBookingId);
+            }
+        });
+    }
 }
 
 // ===== Initialize =====
