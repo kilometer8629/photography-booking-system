@@ -123,7 +123,7 @@ async function sendPaymentConfirmationSMS(booking) {
   }
   
   try {
-    const amount = (booking.packageAmount / 100 || booking.estimatedCost || 0).toFixed(2);
+    const amount = ((booking.packageAmount || 0) / 100 || booking.estimatedCost || 0).toFixed(2);
     const currency = booking.packageCurrency || '$';
     
     const message = `Payment confirmed! ${currency}${amount} received for your ${booking.package} session. You'll receive a tax receipt via email. Thank you! - Ami Photography`;
@@ -169,7 +169,13 @@ async function sendCancellationSMS(booking, refundAmount, refundReason) {
     const refund = (refundAmount / 100).toFixed(2);
     const currency = booking.packageCurrency || '$';
     
-    const message = `Your booking has been cancelled. Refund of ${currency}${refund} will be processed to your original payment method within 5-7 business days. - Ami Photography`;
+    // Include refund information or no-refund reason
+    let message;
+    if (refundAmount > 0) {
+      message = `Your booking has been cancelled. Refund of ${currency}${refund} will be processed to your original payment method within 5-7 business days. - Ami Photography`;
+    } else {
+      message = `Your booking has been cancelled. ${refundReason || 'No refund applicable per cancellation policy'}. - Ami Photography`;
+    }
     
     const toNumber = formatPhoneNumber(booking.clientPhone);
     
@@ -262,7 +268,22 @@ async function sendBookingReminderSMS(booking, hoursUntil = 24) {
       day: 'numeric'
     });
     
-    const message = `Reminder: Your ${booking.package} session is tomorrow, ${formattedDate} at ${booking.startTime}. Location: ${booking.location}. See you soon! 📸 - Ami Photography`;
+    // Dynamic message based on hours until booking
+    let timePhrase;
+    if (hoursUntil <= 2) {
+      timePhrase = 'in a few hours';
+    } else if (hoursUntil <= 12) {
+      timePhrase = 'later today';
+    } else if (hoursUntil <= 24) {
+      timePhrase = 'tomorrow';
+    } else if (hoursUntil <= 48) {
+      timePhrase = 'in 2 days';
+    } else {
+      const days = Math.round(hoursUntil / 24);
+      timePhrase = `in ${days} days`;
+    }
+    
+    const message = `Reminder: Your ${booking.package} session is ${timePhrase}, ${formattedDate} at ${booking.startTime}. Location: ${booking.location}. See you soon! 📸 - Ami Photography`;
     
     const toNumber = formatPhoneNumber(booking.clientPhone);
     
