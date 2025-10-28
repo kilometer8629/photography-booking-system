@@ -1,4 +1,4 @@
-require('../config/loadEnv');
+require('../../config/loadEnv');
 const twilio = require('twilio');
 
 // Initialize Twilio client
