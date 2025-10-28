@@ -23,6 +23,14 @@ const {
 const { getZohoDiagnostics } = require('./services/zohoDiagnostics');
 const { buildSlotsForDay, filterSlots } = require('./utils/slots');
 const Stripe = require('stripe');
+const {
+  sendBookingConfirmationSMS,
+  sendBookingStatusChangeSMS,
+  sendRescheduleConfirmationSMS,
+  sendPaymentConfirmationSMS,
+  sendCancellationSMS,
+  twilioEnabled
+} = require('./services/twilioClient');
 
 // ===== Import Models =====
 const { Booking, Message, Admin } = require('./models');
@@ -330,6 +338,16 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
             console.log(`✅ Tax receipt email sent to ${booking.clientEmail}`);
           } else {
             console.warn(`⚠️ Failed to send tax receipt email: ${emailResult.error}`);
+          }
+        }
+
+        // Send payment confirmation SMS
+        if (booking.clientPhone && twilioEnabled) {
+          const smsResult = await sendPaymentConfirmationSMS(booking);
+          if (smsResult.success) {
+            console.log(`✅ Payment confirmation SMS sent to ${booking.clientPhone}`);
+          } else {
+            console.warn(`⚠️ Failed to send payment confirmation SMS: ${smsResult.error}`);
           }
         }
 
@@ -871,6 +889,16 @@ app.post('/api/customer/reschedule', async (req, res) => {
     const rescheduleTemplate = getRescheduleEmailTemplate(booking, newDate, newTime, reason);
     await sendConfirmationEmail(booking.clientEmail, rescheduleTemplate);
 
+    // Send reschedule confirmation SMS
+    if (booking.clientPhone && twilioEnabled) {
+      const smsResult = await sendRescheduleConfirmationSMS(booking, newDate, newTime);
+      if (smsResult.success) {
+        console.log(`✅ Reschedule confirmation SMS sent to ${booking.clientPhone}`);
+      } else {
+        console.warn(`⚠️ Failed to send reschedule SMS: ${smsResult.error}`);
+      }
+    }
+
     console.log(`✅ Reschedule request submitted for booking ${bookingId}`);
 
     res.json({ success: true, message: 'Reschedule request submitted. You\'ll receive confirmation within 24 hours.' });
@@ -928,6 +956,16 @@ app.post('/api/customer/cancel', async (req, res) => {
     // Send cancellation confirmation email
     const cancellationTemplate = getCancellationEmailTemplate(booking, refundAmount, refundReason);
     await sendConfirmationEmail(booking.clientEmail, cancellationTemplate);
+
+    // Send cancellation SMS
+    if (booking.clientPhone && twilioEnabled) {
+      const smsResult = await sendCancellationSMS(booking, refundAmount, refundReason);
+      if (smsResult.success) {
+        console.log(`✅ Cancellation SMS sent to ${booking.clientPhone}`);
+      } else {
+        console.warn(`⚠️ Failed to send cancellation SMS: ${smsResult.error}`);
+      }
+    }
 
     console.log(`✅ Booking ${bookingId} cancelled by customer. Refund: $${(refundAmount / 100).toFixed(2)}`);
 
@@ -1229,6 +1267,16 @@ app.post('/api/admin/bookings/:id/confirm', csrfProtection, async (req, res) => 
     );
 
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    // Send booking confirmation SMS
+    if (booking.clientPhone && twilioEnabled) {
+      const smsResult = await sendBookingConfirmationSMS(booking);
+      if (smsResult.success) {
+        console.log(`✅ Booking confirmation SMS sent to ${booking.clientPhone}`);
+      } else {
+        console.warn(`⚠️ Failed to send booking confirmation SMS: ${smsResult.error}`);
+      }
+    }
 
     res.json({
       ...booking.toObject(),

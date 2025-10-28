@@ -43,6 +43,7 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.10",
     "stripe": "^14.19.0",
+    "twilio": "^5.10.3",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
