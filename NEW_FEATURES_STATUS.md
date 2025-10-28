@@ -37,8 +37,8 @@ The Photography Booking System has **successfully implemented** the Twilio SMS n
 - ✅ **Line 1273**: Admin confirm booking → sends booking confirmation SMS
 
 #### Testing & Quality
-- ✅ **Unit Tests**: 9 test cases in `tests/twilio.test.js`
-- ✅ **Test Results**: All tests passing (11/11 total tests)
+- ✅ **Unit Tests**: 9 test cases in `tests/twilio.test.js`, 2 in `tests/slots.test.js`
+- ✅ **Test Results**: All tests passing (11/11 total across 2 test files)
 - ✅ **Security Scan**: CodeQL completed with 0 vulnerabilities
 - ✅ **Code Review**: Completed and addressed
 
@@ -266,7 +266,7 @@ Hi [Name], your booking has been cancelled. Refund of $[amount] will be processe
 - **Australia**: ~$13.50/month
 - **United States**: ~$1.50/month
 
-Check current rates at [Twilio Pricing](https://www.twilio.com/pricing)
+**Note**: Prices shown are approximate and subject to change. Always check current rates at [Twilio Pricing](https://www.twilio.com/pricing) for accurate pricing information.
 
 ---
 

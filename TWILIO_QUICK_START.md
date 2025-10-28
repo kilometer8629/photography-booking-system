@@ -135,12 +135,6 @@ Hi John, your booking has been cancelled. Refund of $299.00 will be processed to
 - ✅ Verify sender phone number is active
 - ✅ Check spam/blocked messages on phone
 
-### Test in Development Mode
-```bash
-# Set test mode to avoid sending real SMS
-TWILIO_TEST_MODE=true npm start
-```
-
 ## 💰 Cost Management
 
 Monitor your SMS usage:
