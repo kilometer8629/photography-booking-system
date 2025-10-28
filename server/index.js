@@ -23,6 +23,14 @@ const {
 const { getZohoDiagnostics } = require('./services/zohoDiagnostics');
 const { buildSlotsForDay, filterSlots } = require('./utils/slots');
 const Stripe = require('stripe');
+const {
+  sendBookingConfirmationSMS,
+  sendPaymentConfirmationSMS,
+  sendRescheduleNotificationSMS,
+  sendCancellationSMS,
+  sendBookingReminderSMS,
+  isTwilioConfigured
+} = require('./services/twilioClient');
 
 // ===== Import Models =====
 const { Booking, Message, Admin } = require('./models');
@@ -50,6 +58,13 @@ const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 if (!stripe) {
   console.warn('Stripe secret key not configured. Pre-purchase checkout is disabled.');
+}
+
+// Log Twilio configuration status
+if (isTwilioConfigured()) {
+  console.log('✅ Twilio SMS notifications enabled');
+} else {
+  console.warn('⚠️ Twilio SMS notifications disabled - configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER');
 }
 
 const successUrl = process.env.STRIPE_SUCCESS_URL || `${process.env.CLIENT_URL || 'http://localhost:3000'}/booking.html?status=success`;
@@ -330,6 +345,16 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
             console.log(`✅ Tax receipt email sent to ${booking.clientEmail}`);
           } else {
             console.warn(`⚠️ Failed to send tax receipt email: ${emailResult.error}`);
+          }
+        }
+
+        // Send payment confirmation SMS
+        if (booking.clientPhone && isTwilioConfigured()) {
+          const smsResult = await sendPaymentConfirmationSMS(booking);
+          if (smsResult.success) {
+            console.log(`✅ Payment confirmation SMS sent to ${booking.clientPhone}`);
+          } else {
+            console.warn(`⚠️ Failed to send payment confirmation SMS: ${smsResult.error}`);
           }
         }
 
@@ -871,6 +896,16 @@ app.post('/api/customer/reschedule', async (req, res) => {
     const rescheduleTemplate = getRescheduleEmailTemplate(booking, newDate, newTime, reason);
     await sendConfirmationEmail(booking.clientEmail, rescheduleTemplate);
 
+    // Send reschedule SMS notification
+    if (booking.clientPhone && isTwilioConfigured()) {
+      const smsResult = await sendRescheduleNotificationSMS(booking, newDate, newTime);
+      if (smsResult.success) {
+        console.log(`✅ Reschedule SMS sent to ${booking.clientPhone}`);
+      } else {
+        console.warn(`⚠️ Failed to send reschedule SMS: ${smsResult.error}`);
+      }
+    }
+
     console.log(`✅ Reschedule request submitted for booking ${bookingId}`);
 
     res.json({ success: true, message: 'Reschedule request submitted. You\'ll receive confirmation within 24 hours.' });
@@ -928,6 +963,16 @@ app.post('/api/customer/cancel', async (req, res) => {
     // Send cancellation confirmation email
     const cancellationTemplate = getCancellationEmailTemplate(booking, refundAmount, refundReason);
     await sendConfirmationEmail(booking.clientEmail, cancellationTemplate);
+
+    // Send cancellation SMS notification
+    if (booking.clientPhone && isTwilioConfigured()) {
+      const smsResult = await sendCancellationSMS(booking, refundAmount);
+      if (smsResult.success) {
+        console.log(`✅ Cancellation SMS sent to ${booking.clientPhone}`);
+      } else {
+        console.warn(`⚠️ Failed to send cancellation SMS: ${smsResult.error}`);
+      }
+    }
 
     console.log(`✅ Booking ${bookingId} cancelled by customer. Refund: $${(refundAmount / 100).toFixed(2)}`);
 
@@ -1038,7 +1083,8 @@ app.get('/api/admin/check-auth', noCache, (req, res) => {
     res.json({
       authenticated: !!req.session.admin,
       username: req.session.admin ? process.env.ADMIN_USERNAME : null,
-      csrfValid: true
+      csrfValid: true,
+      twilioConfigured: isTwilioConfigured()
     });
   } catch (err) {
     res.status(500).json({ error: 'Auth check failed' });
@@ -1339,6 +1385,115 @@ app.post('/api/admin/messages/:id/mark-read', csrfProtection, async (req, res) =
       error: 'Failed to mark message as read',
       csrfToken: req.csrfToken()
     });
+  }
+});
+
+// ===== SMS Notification Endpoints =====
+
+// Send booking reminder SMS
+app.post('/api/admin/bookings/:id/send-reminder', csrfProtection, async (req, res) => {
+  try {
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    if (!isTwilioConfigured()) {
+      return res.status(503).json({ 
+        error: 'SMS service not configured',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Calculate days until event
+    const eventDate = new Date(booking.eventDate);
+    const today = new Date();
+    const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
+
+    const smsResult = await sendBookingReminderSMS(booking, daysUntil);
+
+    if (smsResult.success) {
+      res.json({
+        success: true,
+        message: 'Reminder SMS sent successfully',
+        messageSid: smsResult.messageSid,
+        csrfToken: req.csrfToken()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: smsResult.error,
+        csrfToken: req.csrfToken()
+      });
+    }
+  } catch (error) {
+    console.error('Send reminder SMS error:', error);
+    res.status(500).json({
+      error: 'Failed to send reminder SMS',
+      csrfToken: req.csrfToken()
+    });
+  }
+});
+
+// Send booking confirmation SMS
+app.post('/api/admin/bookings/:id/send-confirmation-sms', csrfProtection, async (req, res) => {
+  try {
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    if (!isTwilioConfigured()) {
+      return res.status(503).json({ 
+        error: 'SMS service not configured',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const smsResult = await sendBookingConfirmationSMS(booking);
+
+    if (smsResult.success) {
+      res.json({
+        success: true,
+        message: 'Confirmation SMS sent successfully',
+        messageSid: smsResult.messageSid,
+        csrfToken: req.csrfToken()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: smsResult.error,
+        csrfToken: req.csrfToken()
+      });
+    }
+  } catch (error) {
+    console.error('Send confirmation SMS error:', error);
+    res.status(500).json({
+      error: 'Failed to send confirmation SMS',
+      csrfToken: req.csrfToken()
+    });
+  }
+});
+
+// Get SMS service status
+app.get('/api/admin/sms/status', async (req, res) => {
+  try {
+    res.json({
+      configured: isTwilioConfigured(),
+      phoneNumber: isTwilioConfigured() ? process.env.TWILIO_PHONE_NUMBER : null,
+      accountSid: isTwilioConfigured() ? process.env.TWILIO_ACCOUNT_SID?.substring(0, 10) + '...' : null
+    });
+  } catch (error) {
+    console.error('SMS status check error:', error);
+    res.status(500).json({ error: 'Failed to check SMS status' });
   }
 });
 
