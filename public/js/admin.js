@@ -51,18 +51,18 @@ function renderBookingsData() {
     if (!elements.bookingsList || !state.bookings.data.length) return;
 
     elements.bookingsList.innerHTML = state.bookings.data.map(booking => `
-        <tr class="booking-row ${booking.status}">
-            <td>${booking.id}</td>
-            <td>${booking.clientName}</td>
-            <td>${booking.clientEmail}</td>
+        <tr class="booking-row ${escapeHtml(booking.status)}">
+            <td>${escapeHtml(booking.id)}</td>
+            <td>${escapeHtml(booking.clientName)}</td>
+            <td>${escapeHtml(booking.clientEmail)}</td>
             <td>${new Date(booking.eventDate).toLocaleDateString()}</td>
-            <td>${booking.packageName}</td>
-            <td class="status-cell"><span class="status-badge ${booking.status}">${booking.status}</span></td>
+            <td>${escapeHtml(booking.packageName || booking.package || '')}</td>
+            <td class="status-cell"><span class="status-badge ${escapeHtml(booking.status)}">${escapeHtml(booking.status)}</span></td>
             <td class="actions-cell">
-                <button class="btn btn-view view" data-id="${booking.id}">
+                <button class="btn btn-view view" data-id="${escapeHtml(booking.id)}">
                     <i class="fas fa-eye"></i> View
                 </button>
-                <button class="btn btn-export export" data-id="${booking.id}">
+                <button class="btn btn-export export" data-id="${escapeHtml(booking.id)}">
                     <i class="fas fa-file-export"></i> Export
                 </button>
             </td>
@@ -85,20 +85,22 @@ function renderBookingsData() {
 function renderMessagesData() {
     if (!elements.messagesList || !state.messages.data.length) return;
 
-    elements.messagesList.innerHTML = state.messages.data.map(message => `
+    elements.messagesList.innerHTML = state.messages.data.map(message => {
+        const messageDate = message.date || message.createdAt;
+        return `
         <tr class="message-row ${message.read ? 'read' : 'unread'}">
-            <td>${message.id}</td>
-            <td>${message.name}</td>
-            <td>${message.email}</td>
-            <td>${message.subject}</td>
-            <td>${new Date(message.date).toLocaleDateString()}</td>
+            <td>${escapeHtml(message.id)}</td>
+            <td>${escapeHtml(message.name)}</td>
+            <td>${escapeHtml(message.email)}</td>
+            <td>${escapeHtml(message.subject)}</td>
+            <td>${messageDate ? new Date(messageDate).toLocaleDateString() : 'Unknown'}</td>
             <td class="actions-cell">
-                <button class="btn btn-view view" data-id="${message.id}">
+                <button class="btn btn-view view" data-id="${escapeHtml(message.id)}">
                     <i class="fas fa-eye"></i> View
                 </button>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     // Add event listeners to the view buttons
     const viewButtons = elements.messagesList.querySelectorAll('.btn-view');
@@ -551,6 +553,11 @@ function updateSectionUI(sectionId) {
 }
 
 // ===== Modal System =====
+function closeModal() {
+    const modals = document.querySelectorAll('.modal-overlay');
+    modals.forEach(modal => modal.remove());
+}
+
 function createModal(config) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -1155,22 +1162,23 @@ document.addEventListener('DOMContentLoaded', function() {
 function showBookingModal(booking) {
     console.log('Booking object:', booking);
     console.log('Booking status:', booking.status);
+    const amount = booking.packageAmount ? (booking.packageAmount / 100).toFixed(2) : '0.00';
     const content = `
         <div class="modal-row">
             <span class="modal-label">Client:</span>
-            <span>${booking.clientName}</span>
+            <span>${escapeHtml(booking.clientName)}</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Email:</span>
-            <span>${booking.clientEmail}</span>
+            <span>${escapeHtml(booking.clientEmail)}</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Phone:</span>
-            <span>${booking.clientPhone}</span>
+            <span>${escapeHtml(booking.clientPhone)}</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Event Type:</span>
-            <span>${booking.eventType}</span>
+            <span>${escapeHtml(booking.eventType)}</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Event Date:</span>
@@ -1178,15 +1186,15 @@ function showBookingModal(booking) {
         </div>
         <div class="modal-row">
             <span class="modal-label">Time Slot:</span>
-            <span>${booking.startTime} - ${booking.endTime}</span>
+            <span>${escapeHtml(booking.startTime)} - ${escapeHtml(booking.endTime)}</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Package:</span>
-            <span>${booking.package}</span>
+            <span>${escapeHtml(booking.package)}</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Amount:</span>
-            <span>${booking.packageCurrency ? booking.packageCurrency + ' ' : ''}${(booking.packageAmount / 100).toFixed(2)}</span>
+            <span>${escapeHtml(booking.packageCurrency || '')} ${amount}</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Status:</span>
@@ -1221,11 +1229,11 @@ function showBookingModal(booking) {
         <div class="modal-row full-width">
             <span class="modal-label">Additional Notes:</span>
             <div class="message-content">
-                <p>${booking.additionalNotes || 'No additional notes'}</p>
+                <p>${escapeHtml(booking.additionalNotes || 'No additional notes')}</p>
             </div>
         </div>
     `;
-    
+
     // Create footer based on booking status
     // If payment is confirmed, show as confirmed regardless of status field
     const effectiveStatus = booking.depositPaid ? 'confirmed' : booking.status;
@@ -1482,18 +1490,19 @@ async function archiveMessage(messageId) {
 }
 
 function showMessageModal(message) {
+    const messageDate = message.date || message.createdAt;
     const content = `
         <div class="modal-row">
             <span class="modal-label">From:</span>
-            <span>${message.name} &lt;${message.email}&gt;</span>
+            <span>${escapeHtml(message.name)} &lt;${escapeHtml(message.email)}&gt;</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Date:</span>
-            <span>${new Date(message.date).toLocaleString()}</span>
+            <span>${messageDate ? new Date(messageDate).toLocaleString() : 'Unknown'}</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Subject:</span>
-            <span>${message.subject}</span>
+            <span>${escapeHtml(message.subject)}</span>
         </div>
         <div class="modal-row">
             <span class="modal-label">Status:</span>
@@ -1504,7 +1513,7 @@ function showMessageModal(message) {
         <div class="modal-row full-width">
             <span class="modal-label">Message:</span>
             <div class="message-content">
-                <p>${message.message}</p>
+                <p>${escapeHtml(message.message)}</p>
             </div>
         </div>
     `;

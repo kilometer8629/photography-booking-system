@@ -1216,23 +1216,30 @@ app.get('/api/admin/bookings/export', async (req, res) => {
 // Helper function to generate CSV
 function generateBookingCSV(booking) {
   const headers = ['Field', 'Value'];
+  const amount = booking.packageAmount ? (booking.packageAmount / 100).toFixed(2) : (booking.estimatedCost || 'N/A');
+  const eventDate = booking.eventDate ? new Date(booking.eventDate).toLocaleDateString() : 'N/A';
   const rows = [
-    ['Client Name', booking.clientName],
-    ['Client Email', booking.clientEmail],
-    ['Client Phone', booking.clientPhone],
-    ['Event Date', booking.eventDate],
-    ['Start Time', booking.startTime],
-    ['End Time', booking.endTime],
-    ['Package', booking.package],
-    ['Status', booking.status],
-    ['Location', booking.location],
-    ['Amount', booking.packageAmount / 100],
+    ['Client Name', booking.clientName || ''],
+    ['Client Email', booking.clientEmail || ''],
+    ['Client Phone', booking.clientPhone || ''],
+    ['Event Date', eventDate],
+    ['Start Time', booking.startTime || ''],
+    ['End Time', booking.endTime || ''],
+    ['Package', booking.package || ''],
+    ['Status', booking.status || ''],
+    ['Location', booking.location || ''],
+    ['Amount', amount],
+    ['Currency', booking.packageCurrency || 'AUD'],
     ['Deposit Paid', booking.depositPaid ? 'Yes' : 'No'],
     ['Paid At', booking.stripePaidAt ? new Date(booking.stripePaidAt).toLocaleString() : 'N/A']
   ];
 
   const headerString = headers.join(',');
-  const rowStrings = rows.map(row => `"${row[0]}","${row[1] || ''}"`).join('\n');
+  // Escape quotes in values for proper CSV formatting
+  const rowStrings = rows.map(row => {
+    const value = String(row[1] || '').replace(/"/g, '""');
+    return `"${row[0]}","${value}"`;
+  }).join('\n');
 
   return `${headerString}\n${rowStrings}`;
 }
@@ -1291,25 +1298,119 @@ app.post('/api/admin/bookings/:id/confirm', csrfProtection, async (req, res) => 
   }
 });
 
-app.get('/api/admin/bookings/export', async (req, res) => {
+// Cancel booking (admin)
+app.post('/api/admin/bookings/:id/cancel', csrfProtection, async (req, res) => {
   try {
-    let dataToExport;
-    const { id, format = 'json' } = req.query;
-
-    if (id) {
-      const booking = await Booking.findById(id);
-      if (!booking) return res.status(404).json({ error: 'Booking not found' });
-      dataToExport = booking;
-    } else {
-      dataToExport = await Booking.find({}).sort({ createdAt: -1 });
+    // Validate ID
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ error: 'Invalid booking ID' });
     }
 
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename=booking${id ? `-${id}` : 's'}.json`);
-    res.send(JSON.stringify(dataToExport, null, 2));
+    const { reason } = req.body || {};
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ error: 'Booking is already cancelled' });
+    }
+
+    // Update booking status
+    booking.status = 'cancelled';
+    booking.additionalNotes = reason
+      ? `Cancelled by admin: ${reason}. Previous notes: ${booking.additionalNotes || 'None'}`
+      : `Cancelled by admin. Previous notes: ${booking.additionalNotes || 'None'}`;
+
+    await booking.save();
+
+    // Delete the Zoho event if exists
+    if (booking.zohoEventId) {
+      try {
+        await deleteZohoEvent(booking.zohoEventId);
+        console.log(`✅ Zoho event ${booking.zohoEventId} deleted`);
+      } catch (zohoError) {
+        console.warn(`⚠️ Failed to delete Zoho event: ${zohoError.message}`);
+      }
+    }
+
+    // Send cancellation SMS
+    if (booking.clientPhone && twilioEnabled) {
+      const smsResult = await sendBookingStatusChangeSMS(booking, 'cancelled');
+      if (smsResult.success) {
+        console.log(`✅ Cancellation SMS sent to ${booking.clientPhone}`);
+      } else {
+        console.warn(`⚠️ Failed to send cancellation SMS: ${smsResult.error}`);
+      }
+    }
+
+    console.log(`✅ Booking ${req.params.id} cancelled by admin`);
+
+    res.json({
+      success: true,
+      message: 'Booking cancelled successfully',
+      booking: booking.toObject(),
+      csrfToken: req.csrfToken()
+    });
   } catch (error) {
-    console.error('Export error:', error);
-    res.status(500).json({ error: 'Export failed' });
+    console.error('Cancel booking error:', error);
+    res.status(500).json({
+      error: 'Failed to cancel booking',
+      csrfToken: req.csrfToken()
+    });
+  }
+});
+
+// Restore cancelled booking (admin)
+app.post('/api/admin/bookings/:id/restore', csrfProtection, async (req, res) => {
+  try {
+    // Validate ID
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    if (booking.status !== 'cancelled') {
+      return res.status(400).json({ error: 'Only cancelled bookings can be restored' });
+    }
+
+    // Check if the event date is in the past
+    const eventDate = new Date(booking.eventDate);
+    if (eventDate < new Date()) {
+      return res.status(400).json({ error: 'Cannot restore booking for past events' });
+    }
+
+    // Restore booking to pending status
+    booking.status = 'pending';
+    booking.additionalNotes = `Restored by admin on ${new Date().toISOString()}. Previous notes: ${booking.additionalNotes || 'None'}`;
+
+    await booking.save();
+
+    // Send status change SMS
+    if (booking.clientPhone && twilioEnabled) {
+      const smsResult = await sendBookingStatusChangeSMS(booking, 'pending');
+      if (smsResult.success) {
+        console.log(`✅ Restoration SMS sent to ${booking.clientPhone}`);
+      } else {
+        console.warn(`⚠️ Failed to send restoration SMS: ${smsResult.error}`);
+      }
+    }
+
+    console.log(`✅ Booking ${req.params.id} restored by admin`);
+
+    res.json({
+      success: true,
+      message: 'Booking restored successfully',
+      booking: booking.toObject(),
+      csrfToken: req.csrfToken()
+    });
+  } catch (error) {
+    console.error('Restore booking error:', error);
+    res.status(500).json({
+      error: 'Failed to restore booking',
+      csrfToken: req.csrfToken()
+    });
   }
 });
 
@@ -1369,7 +1470,7 @@ app.post('/api/admin/messages/:id/mark-read', csrfProtection, async (req, res) =
   try {
     const message = await Message.findByIdAndUpdate(
       req.params.id,
-      { read: true },
+      { read: true, readAt: new Date() },
       { new: true }
     );
 
@@ -1385,6 +1486,68 @@ app.post('/api/admin/messages/:id/mark-read', csrfProtection, async (req, res) =
     console.error('Mark read error:', error);
     res.status(500).json({
       error: 'Failed to mark message as read',
+      csrfToken: req.csrfToken()
+    });
+  }
+});
+
+// Mark message as unread
+app.post('/api/admin/messages/:id/mark-unread', csrfProtection, async (req, res) => {
+  try {
+    // Validate ID
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ error: 'Invalid message ID' });
+    }
+
+    const message = await Message.findByIdAndUpdate(
+      req.params.id,
+      { read: false, readAt: null },
+      { new: true }
+    );
+
+    if (!message) return res.status(404).json({ error: 'Message not found' });
+
+    res.json({
+      success: true,
+      message: 'Message marked as unread',
+      data: message,
+      csrfToken: req.csrfToken()
+    });
+  } catch (error) {
+    console.error('Mark unread error:', error);
+    res.status(500).json({
+      error: 'Failed to mark message as unread',
+      csrfToken: req.csrfToken()
+    });
+  }
+});
+
+// Archive message
+app.post('/api/admin/messages/:id/archive', csrfProtection, async (req, res) => {
+  try {
+    // Validate ID
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ error: 'Invalid message ID' });
+    }
+
+    const message = await Message.findByIdAndUpdate(
+      req.params.id,
+      { archived: true, archivedAt: new Date() },
+      { new: true }
+    );
+
+    if (!message) return res.status(404).json({ error: 'Message not found' });
+
+    res.json({
+      success: true,
+      message: 'Message archived successfully',
+      data: message,
+      csrfToken: req.csrfToken()
+    });
+  } catch (error) {
+    console.error('Archive message error:', error);
+    res.status(500).json({
+      error: 'Failed to archive message',
       csrfToken: req.csrfToken()
     });
   }
