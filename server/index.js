@@ -1735,9 +1735,10 @@ const upload = multer({
   storage: uploadStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: (req, file, cb) => {
-    const allowed = /jpeg|jpg|png|gif|pdf|webp/;
-    const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
-    const mimeOk = allowed.test(file.mimetype);
+    const allowedExt = /^\.(jpeg|jpg|png|gif|pdf|webp)$/;
+    const allowedMime = /^(image\/(jpeg|png|gif|webp)|application\/pdf)$/;
+    const extOk = allowedExt.test(path.extname(file.originalname).toLowerCase());
+    const mimeOk = allowedMime.test(file.mimetype);
     cb(extOk && mimeOk ? null : new Error('Only images and PDFs are allowed'), extOk && mimeOk);
   }
 });
@@ -1776,17 +1777,23 @@ app.get('/api/admin/uploads', authenticate, (req, res) => {
   }
 });
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Serve uploaded files (admin only)
+app.use('/uploads', authenticate, express.static(path.join(__dirname, '../uploads')));
 
 // ===== Client Portal — JWT Authentication =====
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-jwt-secret';
+const JWT_SECRET = process.env.SESSION_SECRET || (() => {
+  console.warn('⚠️ SESSION_SECRET not set — client portal JWT auth is disabled.');
+  return '';
+})();
 
 app.post('/api/client/login', async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'Email is required' });
+  }
+  if (!JWT_SECRET) {
+    return res.status(503).json({ error: 'Client authentication is not configured' });
   }
 
   const booking = await Booking.findOne({ clientEmail: email.toLowerCase().trim() });
@@ -1866,7 +1873,7 @@ app.get('/api/client/bookings', authenticateClient, async (req, res) => {
 app.post('/api/admin/refund', authenticate, async (req, res) => {
   const { bookingId, amount } = req.body;
 
-  if (!bookingId) {
+  if (!bookingId || typeof bookingId !== 'string') {
     return res.status(400).json({ error: 'Booking ID is required' });
   }
   if (!stripe) {
@@ -1874,7 +1881,7 @@ app.post('/api/admin/refund', authenticate, async (req, res) => {
   }
 
   try {
-    const booking = await Booking.findById(bookingId);
+    const booking = await Booking.findById(String(bookingId));
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
@@ -1927,10 +1934,31 @@ app.post('/api/admin/refund', authenticate, async (req, res) => {
  *           application/pdf: {}
  */
 app.get('/api/booking/:id/receipt.pdf', async (req, res) => {
+  // Require either admin session or client JWT
+  const isAdmin = !!req.session?.admin;
+  let clientEmail = null;
+  if (!isAdmin) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ') && JWT_SECRET) {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        clientEmail = decoded.email;
+      } catch { /* invalid token */ }
+    }
+  }
+  if (!isAdmin && !clientEmail) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
   try {
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Clients can only access their own receipts
+    if (!isAdmin && clientEmail && booking.clientEmail !== clientEmail) {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     const PDFDocument = require('pdfkit');
@@ -2105,5 +2133,10 @@ process.on('unhandledRejection', (reason) => {
 });
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
-  if (Sentry) Sentry.captureException(err);
+  if (Sentry) {
+    Sentry.captureException(err);
+    Sentry.flush(2000).finally(() => process.exit(1));
+  } else {
+    process.exit(1);
+  }
 });
