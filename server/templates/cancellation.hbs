@@ -1,0 +1,54 @@
+<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+  <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
+    <h1 style="margin: 0 0 10px 0; font-size: 28px;">Booking Cancelled</h1>
+    <p style="margin: 0; opacity: 0.9;">Cancellation Confirmation</p>
+  </div>
+  
+  <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
+    
+    <p style="color: #333; font-size: 16px;">Hi {{clientName}},</p>
+    
+    <p style="color: #555; line-height: 1.6;">
+      Your photography booking has been successfully cancelled. We're sorry to see you go, but we understand things come up. 
+      Below are your cancellation details and refund information.
+    </p>
+    
+    <div style="background: white; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #e0e0e0;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr style="border-bottom: 1px solid #e0e0e0;">
+          <td style="padding: 12px 0; color: #666;"><strong>Original Amount Paid:</strong></td>
+          <td style="text-align: right; padding: 12px 0; color: #333; font-weight: 600;">{{currency}}{{amount}}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e0e0e0;">
+          <td style="padding: 12px 0; color: #666;"><strong>Cancellation Reason:</strong></td>
+          <td style="text-align: right; padding: 12px 0; color: #333;">{{refundReason}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 15px 0; color: #667eea; font-size: 16px;"><strong>Refund Amount:</strong></td>
+          <td style="text-align: right; padding: 15px 0; background-color: #e8f5e9; border-radius: 4px; padding-right: 10px; font-weight: 700; color: #2e7d32; font-size: 18px;">
+            {{currency}}{{refund}}
+          </td>
+        </tr>
+      </table>
+    </div>
+    
+    <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
+      <p style="margin: 0; color: #1565c0; font-size: 14px;">
+        <strong>✓ Refund Processing:</strong> Your refund of {{currency}}{{refund}} will be processed to your original payment method within 5-7 business days.
+      </p>
+    </div>
+    
+    <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0;">
+      <p style="margin: 0; color: #856404; font-size: 14px;">
+        <strong>Want to reschedule instead?</strong> Visit our booking management page to reschedule for another date.
+      </p>
+    </div>
+    
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; text-align: center;">
+      <p style="margin: 5px 0;">If you have any questions about your cancellation or refund, please contact us:<br>
+      📞 (123) 456-7890 • ✉️ info@amiphotography.com<br>
+      <br>
+      We hope to work with you again in the future!</p>
+    </div>
+  </div>
+</div>

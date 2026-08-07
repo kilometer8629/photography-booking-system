@@ -13,6 +13,34 @@ const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const cookieParser = require('cookie-parser');
 const { DateTime } = require('luxon');
+const { validateEnv } = require('./utils/validateEnv');
+const { renderTemplate } = require('./utils/templateRenderer');
+
+// ===== Environment Validation =====
+try {
+  validateEnv();
+} catch (err) {
+  console.error(err.message);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
+
+// ===== Sentry Error Monitoring (optional) =====
+let Sentry;
+if (process.env.SENTRY_DSN) {
+  try {
+    Sentry = require('@sentry/node');
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.NODE_ENV || 'development',
+      tracesSampleRate: 0.2
+    });
+    console.log('✅ Sentry error monitoring initialised');
+  } catch (sentryError) {
+    console.warn('⚠️ Sentry SDK not installed. Run `npm install @sentry/node` to enable error monitoring.');
+  }
+}
 const {
   getAvailabilityForDate,
   getAvailabilityForRange,
@@ -1401,61 +1429,32 @@ const emailTransporter = nodemailer.createTransport({
   }
 });
 
-// Email templates
+// Email templates — rendered from server/templates/*.hbs
 const getContactEmailTemplate = (name, formData) => {
   return {
     subject: 'Thank you for contacting Ami Photography!',
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Hi ${name},</h2>
-          <p>Thank you for reaching out to Ami Photography! We've received your inquiry and are excited to potentially work with you.</p>
-          
-          <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
-            <h3>Your Message Details:</h3>
-            <p><strong>Subject:</strong> ${formData.subject}</p>
-            <p><strong>Message:</strong> ${formData.message}</p>
-            <p><strong>Submitted:</strong> ${new Date().toLocaleDateString()}</p>
-          </div>
-          
-          <p>We'll get back to you within 24-48 hours with a detailed response.</p>
-          <p>In the meantime, feel free to browse our portfolio or check out our photography packages on our website.</p>
-          
-          <p>Best regards,<br>
-          <strong>The Ami Photography Team</strong><br>
-          📞 (123) 456-7890<br>
-          ✉️ info@amiphotography.com</p>
-        </div>
-      `
+    html: renderTemplate('contact', {
+      name,
+      subject: formData.subject,
+      message: formData.message,
+      submittedDate: new Date().toLocaleDateString()
+    })
   };
 };
 
 const getBookingEmailTemplate = (name, formData) => {
   return {
     subject: 'Booking Request Confirmation - Ami Photography',
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Hi ${name},</h2>
-          <p>Thank you for your booking request! We're thrilled that you've chosen Ami Photography for your special event.</p>
-          
-          <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
-            <h3>Your Booking Details:</h3>
-            <p><strong>Event Type:</strong> ${formData.eventType}</p>
-            <p><strong>Date:</strong> ${new Date(formData.date).toLocaleDateString()}</p>
-            <p><strong>Time:</strong> ${formData.startTime} - ${formData.endTime}</p>
-            <p><strong>Location:</strong> ${formData.location}</p>
-            <p><strong>Package:</strong> ${formData.package}</p>
-            <p><strong>Additional Notes:</strong> ${formData.details || 'None'}</p>
-          </div>
-          
-          <p>We'll review your request and get back to you within 24-48 hours to confirm availability and discuss any details.</p>
-          <p>If you have any urgent questions, please don't hesitate to contact us directly.</p>
-          
-          <p>Looking forward to capturing your special moments!<br>
-          <strong>The Ami Photography Team</strong><br>
-          📞 (123) 456-7890<br>
-          ✉️ info@amiphotography.com</p>
-        </div>
-      `
+    html: renderTemplate('booking', {
+      name,
+      eventType: formData.eventType,
+      date: new Date(formData.date).toLocaleDateString(),
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+      location: formData.location,
+      package: formData.package,
+      details: formData.details || 'None'
+    })
   };
 };
 
@@ -1466,85 +1465,21 @@ const getTaxReceiptEmailTemplate = (booking) => {
 
   return {
     subject: 'Tax Receipt for Photography Services - Ami Photography',
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
-            <h1 style="margin: 0 0 10px 0; font-size: 28px;">Ami Photography</h1>
-            <p style="margin: 0; opacity: 0.9;">TAX RECEIPT / INVOICE</p>
-          </div>
-          
-          <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
-              <div>
-                <h3 style="color: #333; margin-top: 0; font-size: 14px; text-transform: uppercase; color: #666;">Bill To</h3>
-                <p style="margin: 5px 0; font-size: 16px; font-weight: bold;">${booking.clientName}</p>
-                <p style="margin: 5px 0; color: #666;">${booking.clientEmail}</p>
-                <p style="margin: 5px 0; color: #666;">${booking.clientPhone}</p>
-              </div>
-              
-              <div style="text-align: right;">
-                <p style="margin: 5px 0; color: #666;"><strong>Receipt #:</strong> ${receiptId}</p>
-                <p style="margin: 5px 0; color: #666;"><strong>Date:</strong> ${receiptDate}</p>
-                <p style="margin: 5px 0; color: #666;"><strong>Session ID:</strong> ${booking.stripeSessionId.substring(0, 20)}...</p>
-              </div>
-            </div>
-            
-            <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 30px; border: 1px solid #e0e0e0;">
-              <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                  <tr style="border-bottom: 2px solid #667eea;">
-                    <th style="text-align: left; padding: 10px 0; color: #333; font-weight: 600;">Description</th>
-                    <th style="text-align: right; padding: 10px 0; color: #333; font-weight: 600;">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr style="border-bottom: 1px solid #e0e0e0;">
-                    <td style="padding: 15px 0; color: #555;">
-                      <strong>${booking.package}</strong><br>
-                      <span style="color: #999; font-size: 12px;">
-                        Event: ${new Date(booking.eventDate).toLocaleDateString()} at ${booking.startTime}<br>
-                        Location: ${booking.location}
-                      </span>
-                    </td>
-                    <td style="text-align: right; padding: 15px 0; color: #333; font-weight: 600; font-size: 16px;">
-                      ${booking.packageCurrency || '$'}${amount}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 20px 0; text-align: right; font-weight: 600; color: #667eea; font-size: 18px;">Total Amount Paid:</td>
-                    <td style="padding: 20px 0; text-align: right; background-color: #f0f4ff; border-radius: 4px; padding-right: 10px; font-weight: 700; color: #667eea; font-size: 18px;">
-                      ${booking.packageCurrency || '$'}${amount}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            
-            <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin-bottom: 30px;">
-              <p style="margin: 0; color: #856404; font-size: 12px;">
-                <strong>✓ Payment Received</strong> - Thank you for your payment. This is a receipt for your records and may be used for tax purposes.
-              </p>
-            </div>
-            
-            <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; font-size: 12px; color: #666; line-height: 1.6;">
-              <p style="margin: 0 0 10px 0;"><strong>Session Details:</strong></p>
-              <ul style="margin: 0; padding-left: 20px;">
-                <li>Date & Time: ${new Date(booking.eventDate).toLocaleDateString()} from ${booking.startTime} to ${booking.endTime}</li>
-                <li>Location: ${booking.location}</li>
-                <li>Package Includes: All high-resolution edited photos</li>
-                <li>Photos Delivery: 7-10 business days via secure online gallery</li>
-              </ul>
-            </div>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; text-align: center;">
-              <p style="margin: 5px 0;">Ami Photography<br>
-              📞 (123) 456-7890 • ✉️ info@amiphotography.com<br>
-              Thank you for your business!</p>
-            </div>
-          </div>
-        </div>
-      `
+    html: renderTemplate('taxReceipt', {
+      clientName: booking.clientName,
+      clientEmail: booking.clientEmail,
+      clientPhone: booking.clientPhone,
+      receiptId,
+      receiptDate,
+      sessionIdShort: booking.stripeSessionId.substring(0, 20),
+      package: booking.package,
+      eventDate: new Date(booking.eventDate).toLocaleDateString(),
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      location: booking.location,
+      currency: booking.packageCurrency || '$',
+      amount
+    })
   };
 };
 
@@ -1554,62 +1489,13 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
 
   return {
     subject: 'Booking Cancellation Confirmation - Ami Photography',
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
-            <h1 style="margin: 0 0 10px 0; font-size: 28px;">Booking Cancelled</h1>
-            <p style="margin: 0; opacity: 0.9;">Cancellation Confirmation</p>
-          </div>
-          
-          <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
-            
-            <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
-            
-            <p style="color: #555; line-height: 1.6;">
-              Your photography booking has been successfully cancelled. We're sorry to see you go, but we understand things come up. 
-              Below are your cancellation details and refund information.
-            </p>
-            
-            <div style="background: white; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #e0e0e0;">
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr style="border-bottom: 1px solid #e0e0e0;">
-                  <td style="padding: 12px 0; color: #666;"><strong>Original Amount Paid:</strong></td>
-                  <td style="text-align: right; padding: 12px 0; color: #333; font-weight: 600;">${booking.packageCurrency || '$'}${amount}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e0e0e0;">
-                  <td style="padding: 12px 0; color: #666;"><strong>Cancellation Reason:</strong></td>
-                  <td style="text-align: right; padding: 12px 0; color: #333;">${refundReason}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 15px 0; color: #667eea; font-size: 16px;"><strong>Refund Amount:</strong></td>
-                  <td style="text-align: right; padding: 15px 0; background-color: #e8f5e9; border-radius: 4px; padding-right: 10px; font-weight: 700; color: #2e7d32; font-size: 18px;">
-                    ${booking.packageCurrency || '$'}${refund}
-                  </td>
-                </tr>
-              </table>
-            </div>
-            
-            <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
-              <p style="margin: 0; color: #1565c0; font-size: 14px;">
-                <strong>✓ Refund Processing:</strong> Your refund of ${booking.packageCurrency || '$'}${refund} will be processed to your original payment method within 5-7 business days.
-              </p>
-            </div>
-            
-            <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0;">
-              <p style="margin: 0; color: #856404; font-size: 14px;">
-                <strong>Want to reschedule instead?</strong> Visit our booking management page to reschedule for another date.
-              </p>
-            </div>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; text-align: center;">
-              <p style="margin: 5px 0;">If you have any questions about your cancellation or refund, please contact us:<br>
-              📞 (123) 456-7890 • ✉️ info@amiphotography.com<br>
-              <br>
-              We hope to work with you again in the future!</p>
-            </div>
-          </div>
-        </div>
-      `
+    html: renderTemplate('cancellation', {
+      clientName: booking.clientName,
+      currency: booking.packageCurrency || '$',
+      amount,
+      refundReason,
+      refund
+    })
   };
 };
 
@@ -1618,56 +1504,16 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
 
   return {
     subject: 'Reschedule Request Received - Ami Photography',
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
-            <h1 style="margin: 0 0 10px 0; font-size: 28px;">Reschedule Request Received</h1>
-            <p style="margin: 0; opacity: 0.9;">We're working on your new date</p>
-          </div>
-          
-          <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
-            
-            <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
-            
-            <p style="color: #555; line-height: 1.6;">
-              Thank you for submitting your reschedule request. We've received your request and will confirm your new date within 24 hours.
-            </p>
-            
-            <div style="background: white; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #e0e0e0;">
-              <h3 style="color: #667eea; margin-top: 0;">Current Booking Details</h3>
-              <p style="margin: 10px 0; color: #555;">
-                <strong>Current Date:</strong> ${eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
-                <strong>Current Time:</strong> ${booking.startTime}<br>
-                <strong>Location:</strong> ${booking.location}<br>
-                <strong>Package:</strong> ${booking.package}
-              </p>
-              
-              <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
-              
-              <h3 style="color: #667eea; margin-top: 0;">Your Requested New Date</h3>
-              <p style="margin: 10px 0; color: #555;">
-                <strong>Requested Date:</strong> ${new Date(newDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
-                <strong>Requested Time:</strong> ${newTime}
-              </p>
-              
-              ${reason ? `<p style="margin: 15px 0; color: #666;"><strong>Reason:</strong> ${reason}</p>` : ''}
-            </div>
-            
-            <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; border-radius: 4px; margin: 20px 0;">
-              <p style="margin: 0; color: #2e7d32; font-size: 14px;">
-                <strong>✓ What's Next?</strong> We'll confirm availability for your new date and send you a confirmation email within 24 hours. Your package and price remain the same.
-              </p>
-            </div>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; text-align: center;">
-              <p style="margin: 5px 0;">If you need to change your request or have questions, please contact us:<br>
-              📞 (123) 456-7890 • ✉️ info@amiphotography.com<br>
-              <br>
-              Thank you for your patience!</p>
-            </div>
-          </div>
-        </div>
-      `
+    html: renderTemplate('reschedule', {
+      clientName: booking.clientName,
+      currentDate: eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      startTime: booking.startTime,
+      location: booking.location,
+      package: booking.package,
+      newDate: new Date(newDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+      newTime,
+      reason: reason || ''
+    })
   };
 };
 
@@ -1837,6 +1683,11 @@ app.use('/api', (req, res) => {
 
 // ===== Error Handling =====
 app.use((err, req, res, next) => {
+  // Report to Sentry when available
+  if (Sentry) {
+    Sentry.captureException(err);
+  }
+
   console.error('Error:', {
     message: err.message,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
@@ -1866,4 +1717,14 @@ app.listen(PORT, () => {
   console.log(`🔗 Access URL: ${process.env.CLIENT_URL || 'http://localhost:' + PORT}`);
   console.log(`🔐 Admin panel: ${process.env.CLIENT_URL || 'http://localhost:' + PORT}/admin.html`);
   console.log(`📡 API Base URL: ${process.env.CLIENT_URL || 'http://localhost:' + PORT}/api/admin\n`);
+});
+
+// ===== Global Unhandled Error Handlers =====
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+  if (Sentry) Sentry.captureException(reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  if (Sentry) Sentry.captureException(err);
 });
