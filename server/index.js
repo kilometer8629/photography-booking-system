@@ -13,6 +13,34 @@ const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const cookieParser = require('cookie-parser');
 const { DateTime } = require('luxon');
+const { validateEnv } = require('./utils/validateEnv');
+const { renderTemplate } = require('./utils/templateRenderer');
+
+// ===== Environment Validation =====
+try {
+  validateEnv();
+} catch (err) {
+  console.error(err.message);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
+
+// ===== Sentry Error Monitoring (optional) =====
+let Sentry;
+if (process.env.SENTRY_DSN) {
+  try {
+    Sentry = require('@sentry/node');
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.NODE_ENV || 'development',
+      tracesSampleRate: 0.2
+    });
+    console.log('✅ Sentry error monitoring initialised');
+  } catch (sentryError) {
+    console.warn('⚠️ Sentry SDK not installed. Run `npm install @sentry/node` to enable error monitoring.');
+  }
+}
 const {
   getAvailabilityForDate,
   getAvailabilityForRange,
@@ -398,6 +426,24 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// ===== Swagger API Documentation =====
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+
+const swaggerSpec = swaggerJsdoc({
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Photography Booking System API',
+      version: '1.0.0',
+      description: 'API documentation for the Ami Photography booking system'
+    },
+    servers: [{ url: '/' }]
+  },
+  apis: [path.join(__dirname, 'index.js')]
+});
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // ===== Static Files =====
 app.use(express.static(path.join(__dirname, '../public'), {
   setHeaders: (res, servedPath) => {
@@ -641,6 +687,27 @@ app.post('/api/create-checkout-session', csrfProtection, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/availability:
+ *   get:
+ *     summary: Get available time slots
+ *     tags: [Booking]
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         schema: { type: string, format: date }
+ *         description: Single date (YYYY-MM-DD)
+ *       - in: query
+ *         name: start
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: end
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Available slots
+ */
 app.get('/api/availability', async (req, res) => {
   try {
     const { date, start, end } = req.query || {};
@@ -744,6 +811,16 @@ app.get('/api/availability', async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/packages:
+ *   get:
+ *     summary: List available photography packages with pricing
+ *     tags: [Booking]
+ *     responses:
+ *       200:
+ *         description: Package catalog
+ */
 app.get('/api/packages', async (req, res) => {
   try {
     const packages = await Promise.all(packageCatalog.map(async (pkg) => {
@@ -1460,30 +1537,16 @@ const getBookingEmailTemplate = (name, formData) => {
 
   return {
     subject: 'Booking Request Confirmation - Ami Photography',
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Hi ${safeName},</h2>
-          <p>Thank you for your booking request! We're thrilled that you've chosen Ami Photography for your special event.</p>
-          
-          <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
-            <h3>Your Booking Details:</h3>
-            <p><strong>Event Type:</strong> ${safeEventType}</p>
-            <p><strong>Date:</strong> ${new Date(formData.date).toLocaleDateString()}</p>
-            <p><strong>Time:</strong> ${safeStartTime} - ${safeEndTime}</p>
-            <p><strong>Location:</strong> ${safeLocation}</p>
-            <p><strong>Package:</strong> ${safePackage}</p>
-            <p><strong>Additional Notes:</strong> ${safeDetails}</p>
-          </div>
-          
-          <p>We'll review your request and get back to you within 24-48 hours to confirm availability and discuss any details.</p>
-          <p>If you have any urgent questions, please don't hesitate to contact us directly.</p>
-          
-          <p>Looking forward to capturing your special moments!<br>
-          <strong>The Ami Photography Team</strong><br>
-          📞 (123) 456-7890<br>
-          ✉️ info@amiphotography.com</p>
-        </div>
-      `
+    html: renderTemplate('booking', {
+      name: safeName,
+      eventType: safeEventType,
+      date: new Date(formData.date).toLocaleDateString(),
+      startTime: safeStartTime,
+      endTime: safeEndTime,
+      location: safeLocation,
+      package: safePackage,
+      details: safeDetails
+    })
   };
 };
 
@@ -1871,6 +1934,367 @@ app.post('/submit-booking', csrfProtection, async (req, res) => {
   }
 });
 
+// ===== File Upload System =====
+const multer = require('multer');
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../uploads');
+    const fs = require('fs');
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `${uniqueSuffix}${ext}`);
+  }
+});
+const upload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    const allowedExt = /^\.(jpeg|jpg|png|gif|pdf|webp)$/;
+    const allowedMime = /^(image\/(jpeg|png|gif|webp)|application\/pdf)$/;
+    const extOk = allowedExt.test(path.extname(file.originalname).toLowerCase());
+    const mimeOk = allowedMime.test(file.mimetype);
+    cb(extOk && mimeOk ? null : new Error('Only images and PDFs are allowed'), extOk && mimeOk);
+  }
+});
+
+app.post('/api/upload', authenticate, upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  res.json({
+    success: true,
+    file: {
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      url: `/uploads/${req.file.filename}`
+    }
+  });
+});
+
+app.get('/api/admin/uploads', authenticate, (req, res) => {
+  const fs = require('fs');
+  const uploadDir = path.join(__dirname, '../uploads');
+  try {
+    if (!fs.existsSync(uploadDir)) {
+      return res.json({ files: [] });
+    }
+    const files = fs.readdirSync(uploadDir).map((name) => ({
+      filename: name,
+      url: `/uploads/${name}`
+    }));
+    res.json({ files });
+  } catch (error) {
+    console.error('List uploads error:', error);
+    res.status(500).json({ error: 'Failed to list uploads' });
+  }
+});
+
+// Serve uploaded files (admin only)
+app.use('/uploads', authenticate, express.static(path.join(__dirname, '../uploads')));
+
+// ===== Client Portal — JWT Authentication =====
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.SESSION_SECRET || (() => {
+  console.warn('⚠️ SESSION_SECRET not set — client portal JWT auth is disabled.');
+  return '';
+})();
+
+app.post('/api/client/login', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+  if (!JWT_SECRET) {
+    return res.status(503).json({ error: 'Client authentication is not configured' });
+  }
+
+  const booking = await Booking.findOne({ clientEmail: email.toLowerCase().trim() });
+  if (!booking) {
+    return res.status(404).json({ error: 'No bookings found for that email' });
+  }
+
+  const token = jwt.sign({ email: email.toLowerCase().trim() }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ success: true, token });
+});
+
+const authenticateClient = (req, res, next) => {
+  if (!JWT_SECRET) {
+    return res.status(503).json({ error: 'Client authentication is not configured' });
+  }
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  try {
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    req.clientEmail = decoded.email;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
+
+app.get('/api/client/bookings', authenticateClient, async (req, res) => {
+  try {
+    const bookings = await Booking.find({ clientEmail: req.clientEmail })
+      .sort({ eventDate: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      bookings: bookings.map((b) => ({
+        _id: b._id,
+        eventDate: b.eventDate,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        location: b.location,
+        package: b.package,
+        status: b.status,
+        depositPaid: b.depositPaid,
+        packageAmount: b.packageAmount,
+        packageCurrency: b.packageCurrency,
+        stripePaidAt: b.stripePaidAt
+      }))
+    });
+  } catch (error) {
+    console.error('Client bookings error:', error);
+    res.status(500).json({ error: 'Failed to fetch bookings' });
+  }
+});
+
+// ===== Payment Refunds =====
+/**
+ * @openapi
+ * /api/admin/refund:
+ *   post:
+ *     summary: Process a refund for a booking
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [bookingId]
+ *             properties:
+ *               bookingId: { type: string }
+ *               amount: { type: number, description: Amount in cents }
+ *     responses:
+ *       200:
+ *         description: Refund processed
+ *       404:
+ *         description: Booking not found
+ */
+app.post('/api/admin/refund', authenticate, async (req, res) => {
+  const { bookingId, amount } = req.body;
+
+  if (!bookingId || typeof bookingId !== 'string') {
+    return res.status(400).json({ error: 'Booking ID is required' });
+  }
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe is not configured' });
+  }
+
+  try {
+    const booking = await Booking.findById(String(bookingId));
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    if (!booking.stripePaymentIntentId) {
+      return res.status(400).json({ error: 'No payment intent found for this booking' });
+    }
+
+    const refundParams = { payment_intent: booking.stripePaymentIntentId };
+    if (amount) {
+      refundParams.amount = Math.round(amount); // amount in cents
+    }
+
+    const refund = await stripe.refunds.create(refundParams);
+
+    booking.status = 'cancelled';
+    booking.additionalNotes = `Refund processed: ${refund.id}. Amount: ${refund.amount / 100} ${refund.currency}`;
+    await booking.save();
+
+    res.json({
+      success: true,
+      refund: {
+        id: refund.id,
+        amount: refund.amount,
+        currency: refund.currency,
+        status: refund.status
+      }
+    });
+  } catch (error) {
+    console.error('Refund error:', error);
+    res.status(500).json({ error: 'Refund failed: ' + error.message });
+  }
+});
+
+// ===== PDF Receipt Download =====
+/**
+ * @openapi
+ * /api/booking/{id}/receipt.pdf:
+ *   get:
+ *     summary: Download booking receipt as PDF
+ *     tags: [Booking]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: PDF file
+ *         content:
+ *           application/pdf: {}
+ */
+app.get('/api/booking/:id/receipt.pdf', async (req, res) => {
+  // Require either admin session or client JWT
+  const isAdmin = !!req.session?.admin;
+  let clientEmail = null;
+  if (!isAdmin) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ') && JWT_SECRET) {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        clientEmail = decoded.email;
+      } catch { /* invalid token */ }
+    }
+  }
+  if (!isAdmin && !clientEmail) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Clients can only access their own receipts
+    if (!isAdmin && clientEmail && booking.clientEmail !== clientEmail) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="receipt-${booking._id}.pdf"`);
+    doc.pipe(res);
+
+    const amount = (booking.packageAmount / 100 || booking.estimatedCost || 0).toFixed(2);
+    const receiptId = `AMI-${booking._id.toString().slice(-8).toUpperCase()}-${new Date().getFullYear()}`;
+    const currency = booking.packageCurrency || '$';
+
+    // Header
+    doc.fontSize(24).text('Ami Photography', { align: 'center' });
+    doc.fontSize(12).text('TAX RECEIPT / INVOICE', { align: 'center' });
+    doc.moveDown(2);
+
+    // Receipt details
+    doc.fontSize(10);
+    doc.text(`Receipt #: ${receiptId}`);
+    doc.text(`Date: ${new Date(booking.stripePaidAt || booking.createdAt).toLocaleDateString()}`);
+    doc.moveDown();
+
+    // Bill To
+    doc.fontSize(12).text('Bill To:', { underline: true });
+    doc.fontSize(10);
+    doc.text(booking.clientName);
+    doc.text(booking.clientEmail);
+    doc.text(booking.clientPhone);
+    doc.moveDown();
+
+    // Service details
+    doc.fontSize(12).text('Service Details:', { underline: true });
+    doc.fontSize(10);
+    doc.text(`Package: ${booking.package}`);
+    doc.text(`Event Date: ${new Date(booking.eventDate).toLocaleDateString()}`);
+    doc.text(`Time: ${booking.startTime} - ${booking.endTime}`);
+    doc.text(`Location: ${booking.location}`);
+    doc.moveDown();
+
+    // Amount
+    doc.fontSize(14).text(`Total Amount Paid: ${currency}${amount}`, { align: 'right' });
+    doc.moveDown(2);
+
+    // Footer
+    doc.fontSize(8).text('Thank you for your business! Photos will be delivered within 7-10 business days.', { align: 'center' });
+    doc.text('Ami Photography • (123) 456-7890 • info@amiphotography.com', { align: 'center' });
+
+    doc.end();
+  } catch (error) {
+    console.error('PDF receipt error:', error);
+    res.status(500).json({ error: 'Failed to generate receipt' });
+  }
+});
+
+// ===== Analytics Dashboard API =====
+app.get('/api/admin/analytics', authenticate, async (req, res) => {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    const [totalBookings, monthBookings, confirmedBookings, cancelledBookings, revenueAgg, monthlyRevenueAgg, packageBreakdown] = await Promise.all([
+      Booking.countDocuments(),
+      Booking.countDocuments({ createdAt: { $gte: startOfMonth } }),
+      Booking.countDocuments({ status: 'confirmed' }),
+      Booking.countDocuments({ status: 'cancelled' }),
+      Booking.aggregate([
+        { $match: { depositPaid: true } },
+        { $group: { _id: null, total: { $sum: '$packageAmount' } } }
+      ]),
+      Booking.aggregate([
+        { $match: { createdAt: { $gte: startOfYear }, depositPaid: true } },
+        {
+          $group: {
+            _id: { $month: '$createdAt' },
+            revenue: { $sum: '$packageAmount' },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      Booking.aggregate([
+        { $group: { _id: '$package', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ])
+    ]);
+
+    const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
+
+    res.json({
+      totalBookings,
+      monthBookings,
+      confirmedBookings,
+      cancelledBookings,
+      totalRevenue,
+      totalRevenueFormatted: `$${(totalRevenue / 100).toFixed(2)}`,
+      monthlyRevenue: monthlyRevenueAgg.map((m) => ({
+        month: m._id,
+        revenue: m.revenue,
+        revenueFormatted: `$${(m.revenue / 100).toFixed(2)}`,
+        bookings: m.count
+      })),
+      packageBreakdown: packageBreakdown.map((p) => ({
+        package: p._id,
+        count: p.count
+      }))
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
 // ===== Serve Frontend Static Files in Production =====
 if (process.env.NODE_ENV === 'production') {
   const buildPath = path.join(__dirname, '../dist');
@@ -1887,6 +2311,11 @@ app.use('/api', (req, res) => {
 
 // ===== Error Handling =====
 app.use((err, req, res, next) => {
+  // Report to Sentry when available
+  if (Sentry) {
+    Sentry.captureException(err);
+  }
+
   console.error('Error:', {
     message: err.message,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
@@ -1916,4 +2345,19 @@ app.listen(PORT, () => {
   console.log(`🔗 Access URL: ${process.env.CLIENT_URL || 'http://localhost:' + PORT}`);
   console.log(`🔐 Admin panel: ${process.env.CLIENT_URL || 'http://localhost:' + PORT}/admin.html`);
   console.log(`📡 API Base URL: ${process.env.CLIENT_URL || 'http://localhost:' + PORT}/api/admin\n`);
+});
+
+// ===== Global Unhandled Error Handlers =====
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+  if (Sentry) Sentry.captureException(reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  if (Sentry) {
+    Sentry.captureException(err);
+    Sentry.flush(2000).finally(() => process.exit(1));
+  } else {
+    process.exit(1);
+  }
 });
