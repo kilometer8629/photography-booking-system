@@ -1401,19 +1401,38 @@ const emailTransporter = nodemailer.createTransport({
   }
 });
 
+const sanitizeEmailValue = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const ALLOWED_EMAIL_CURRENCIES = new Set(['$', '€', '£', '¥', '₹', 'USD', 'EUR', 'GBP', 'AUD', 'CAD']);
+
+const sanitizeCurrencyValue = (value) => {
+  const currency = String(value ?? '$').trim();
+  return ALLOWED_EMAIL_CURRENCIES.has(currency) ? currency : '$';
+};
+
 // Email templates
 const getContactEmailTemplate = (name, formData) => {
+  const safeName = sanitizeEmailValue(name);
+  const safeSubject = sanitizeEmailValue(formData.subject);
+  const safeMessage = sanitizeEmailValue(formData.message);
+
   return {
     subject: 'Thank you for contacting Ami Photography!',
     html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Hi ${name},</h2>
+          <h2 style="color: #333;">Hi ${safeName},</h2>
           <p>Thank you for reaching out to Ami Photography! We've received your inquiry and are excited to potentially work with you.</p>
           
           <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
             <h3>Your Message Details:</h3>
-            <p><strong>Subject:</strong> ${formData.subject}</p>
-            <p><strong>Message:</strong> ${formData.message}</p>
+            <p><strong>Subject:</strong> ${safeSubject}</p>
+            <p><strong>Message:</strong> ${safeMessage}</p>
             <p><strong>Submitted:</strong> ${new Date().toLocaleDateString()}</p>
           </div>
           
@@ -1430,21 +1449,29 @@ const getContactEmailTemplate = (name, formData) => {
 };
 
 const getBookingEmailTemplate = (name, formData) => {
+  const safeName = sanitizeEmailValue(name);
+  const safeEventType = sanitizeEmailValue(formData.eventType);
+  const safeStartTime = sanitizeEmailValue(formData.startTime);
+  const safeEndTime = sanitizeEmailValue(formData.endTime);
+  const safeLocation = sanitizeEmailValue(formData.location);
+  const safePackage = sanitizeEmailValue(formData.package);
+  const safeDetails = sanitizeEmailValue(formData.details || 'None');
+
   return {
     subject: 'Booking Request Confirmation - Ami Photography',
     html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Hi ${name},</h2>
+          <h2 style="color: #333;">Hi ${safeName},</h2>
           <p>Thank you for your booking request! We're thrilled that you've chosen Ami Photography for your special event.</p>
           
           <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
             <h3>Your Booking Details:</h3>
-            <p><strong>Event Type:</strong> ${formData.eventType}</p>
+            <p><strong>Event Type:</strong> ${safeEventType}</p>
             <p><strong>Date:</strong> ${new Date(formData.date).toLocaleDateString()}</p>
-            <p><strong>Time:</strong> ${formData.startTime} - ${formData.endTime}</p>
-            <p><strong>Location:</strong> ${formData.location}</p>
-            <p><strong>Package:</strong> ${formData.package}</p>
-            <p><strong>Additional Notes:</strong> ${formData.details || 'None'}</p>
+            <p><strong>Time:</strong> ${safeStartTime} - ${safeEndTime}</p>
+            <p><strong>Location:</strong> ${safeLocation}</p>
+            <p><strong>Package:</strong> ${safePackage}</p>
+            <p><strong>Additional Notes:</strong> ${safeDetails}</p>
           </div>
           
           <p>We'll review your request and get back to you within 24-48 hours to confirm availability and discuss any details.</p>
@@ -1463,6 +1490,19 @@ const getTaxReceiptEmailTemplate = (booking) => {
   const amount = (booking.packageAmount / 100 || booking.estimatedCost || 0).toFixed(2);
   const receiptDate = new Date(booking.stripePaidAt || new Date()).toLocaleDateString();
   const receiptId = `AMI-${booking._id.toString().slice(-8).toUpperCase()}-${new Date().getFullYear()}`;
+  const safeClientName = sanitizeEmailValue(booking.clientName);
+  const safeClientEmail = sanitizeEmailValue(booking.clientEmail);
+  const safeClientPhone = sanitizeEmailValue(booking.clientPhone);
+  const safePackage = sanitizeEmailValue(booking.package);
+  const safeStartTime = sanitizeEmailValue(booking.startTime);
+  const safeEndTime = sanitizeEmailValue(booking.endTime);
+  const safeLocation = sanitizeEmailValue(booking.location);
+  const safePackageCurrency = sanitizeCurrencyValue(booking.packageCurrency || '$');
+  const stripeSessionId = String(booking.stripeSessionId || '');
+  const safeStripeSessionId = sanitizeEmailValue(stripeSessionId.substring(0, 20));
+  const safeStripeSessionDisplay = safeStripeSessionId
+    ? `${safeStripeSessionId}${stripeSessionId.length > 20 ? '...' : ''}`
+    : 'N/A';
 
   return {
     subject: 'Tax Receipt for Photography Services - Ami Photography',
@@ -1478,15 +1518,15 @@ const getTaxReceiptEmailTemplate = (booking) => {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
               <div>
                 <h3 style="color: #333; margin-top: 0; font-size: 14px; text-transform: uppercase; color: #666;">Bill To</h3>
-                <p style="margin: 5px 0; font-size: 16px; font-weight: bold;">${booking.clientName}</p>
-                <p style="margin: 5px 0; color: #666;">${booking.clientEmail}</p>
-                <p style="margin: 5px 0; color: #666;">${booking.clientPhone}</p>
+                <p style="margin: 5px 0; font-size: 16px; font-weight: bold;">${safeClientName}</p>
+                <p style="margin: 5px 0; color: #666;">${safeClientEmail}</p>
+                <p style="margin: 5px 0; color: #666;">${safeClientPhone}</p>
               </div>
               
               <div style="text-align: right;">
                 <p style="margin: 5px 0; color: #666;"><strong>Receipt #:</strong> ${receiptId}</p>
                 <p style="margin: 5px 0; color: #666;"><strong>Date:</strong> ${receiptDate}</p>
-                <p style="margin: 5px 0; color: #666;"><strong>Session ID:</strong> ${booking.stripeSessionId.substring(0, 20)}...</p>
+                <p style="margin: 5px 0; color: #666;"><strong>Session ID:</strong> ${safeStripeSessionDisplay}</p>
               </div>
             </div>
             
@@ -1501,20 +1541,20 @@ const getTaxReceiptEmailTemplate = (booking) => {
                 <tbody>
                   <tr style="border-bottom: 1px solid #e0e0e0;">
                     <td style="padding: 15px 0; color: #555;">
-                      <strong>${booking.package}</strong><br>
+                      <strong>${safePackage}</strong><br>
                       <span style="color: #999; font-size: 12px;">
-                        Event: ${new Date(booking.eventDate).toLocaleDateString()} at ${booking.startTime}<br>
-                        Location: ${booking.location}
+                        Event: ${new Date(booking.eventDate).toLocaleDateString()} at ${safeStartTime}<br>
+                        Location: ${safeLocation}
                       </span>
                     </td>
                     <td style="text-align: right; padding: 15px 0; color: #333; font-weight: 600; font-size: 16px;">
-                      ${booking.packageCurrency || '$'}${amount}
+                      ${safePackageCurrency}${amount}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding: 20px 0; text-align: right; font-weight: 600; color: #667eea; font-size: 18px;">Total Amount Paid:</td>
                     <td style="padding: 20px 0; text-align: right; background-color: #f0f4ff; border-radius: 4px; padding-right: 10px; font-weight: 700; color: #667eea; font-size: 18px;">
-                      ${booking.packageCurrency || '$'}${amount}
+                      ${safePackageCurrency}${amount}
                     </td>
                   </tr>
                 </tbody>
@@ -1530,8 +1570,8 @@ const getTaxReceiptEmailTemplate = (booking) => {
             <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; font-size: 12px; color: #666; line-height: 1.6;">
               <p style="margin: 0 0 10px 0;"><strong>Session Details:</strong></p>
               <ul style="margin: 0; padding-left: 20px;">
-                <li>Date & Time: ${new Date(booking.eventDate).toLocaleDateString()} from ${booking.startTime} to ${booking.endTime}</li>
-                <li>Location: ${booking.location}</li>
+                <li>Date & Time: ${new Date(booking.eventDate).toLocaleDateString()} from ${safeStartTime} to ${safeEndTime}</li>
+                <li>Location: ${safeLocation}</li>
                 <li>Package Includes: All high-resolution edited photos</li>
                 <li>Photos Delivery: 7-10 business days via secure online gallery</li>
               </ul>
@@ -1551,6 +1591,9 @@ const getTaxReceiptEmailTemplate = (booking) => {
 const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
   const amount = (booking.packageAmount / 100 || 0).toFixed(2);
   const refund = (refundAmount / 100).toFixed(2);
+  const safeClientName = sanitizeEmailValue(booking.clientName);
+  const safePackageCurrency = sanitizeCurrencyValue(booking.packageCurrency || '$');
+  const safeRefundReason = sanitizeEmailValue(refundReason);
 
   return {
     subject: 'Booking Cancellation Confirmation - Ami Photography',
@@ -1563,7 +1606,7 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
           
           <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
             
-            <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
+            <p style="color: #333; font-size: 16px;">Hi ${safeClientName},</p>
             
             <p style="color: #555; line-height: 1.6;">
               Your photography booking has been successfully cancelled. We're sorry to see you go, but we understand things come up. 
@@ -1574,16 +1617,16 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
               <table style="width: 100%; border-collapse: collapse;">
                 <tr style="border-bottom: 1px solid #e0e0e0;">
                   <td style="padding: 12px 0; color: #666;"><strong>Original Amount Paid:</strong></td>
-                  <td style="text-align: right; padding: 12px 0; color: #333; font-weight: 600;">${booking.packageCurrency || '$'}${amount}</td>
+                  <td style="text-align: right; padding: 12px 0; color: #333; font-weight: 600;">${safePackageCurrency}${amount}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #e0e0e0;">
                   <td style="padding: 12px 0; color: #666;"><strong>Cancellation Reason:</strong></td>
-                  <td style="text-align: right; padding: 12px 0; color: #333;">${refundReason}</td>
+                  <td style="text-align: right; padding: 12px 0; color: #333;">${safeRefundReason}</td>
                 </tr>
                 <tr>
                   <td style="padding: 15px 0; color: #667eea; font-size: 16px;"><strong>Refund Amount:</strong></td>
                   <td style="text-align: right; padding: 15px 0; background-color: #e8f5e9; border-radius: 4px; padding-right: 10px; font-weight: 700; color: #2e7d32; font-size: 18px;">
-                    ${booking.packageCurrency || '$'}${refund}
+                    ${safePackageCurrency}${refund}
                   </td>
                 </tr>
               </table>
@@ -1591,7 +1634,7 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
             
             <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
               <p style="margin: 0; color: #1565c0; font-size: 14px;">
-                <strong>✓ Refund Processing:</strong> Your refund of ${booking.packageCurrency || '$'}${refund} will be processed to your original payment method within 5-7 business days.
+                <strong>✓ Refund Processing:</strong> Your refund of ${safePackageCurrency}${refund} will be processed to your original payment method within 5-7 business days.
               </p>
             </div>
             
@@ -1615,6 +1658,12 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
 
 const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
   const eventDate = new Date(booking.eventDate);
+  const safeClientName = sanitizeEmailValue(booking.clientName);
+  const safeStartTime = sanitizeEmailValue(booking.startTime);
+  const safeLocation = sanitizeEmailValue(booking.location);
+  const safePackage = sanitizeEmailValue(booking.package);
+  const safeNewTime = sanitizeEmailValue(newTime);
+  const safeReason = sanitizeEmailValue(reason);
 
   return {
     subject: 'Reschedule Request Received - Ami Photography',
@@ -1627,7 +1676,7 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
           
           <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
             
-            <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
+            <p style="color: #333; font-size: 16px;">Hi ${safeClientName},</p>
             
             <p style="color: #555; line-height: 1.6;">
               Thank you for submitting your reschedule request. We've received your request and will confirm your new date within 24 hours.
@@ -1637,9 +1686,9 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
               <h3 style="color: #667eea; margin-top: 0;">Current Booking Details</h3>
               <p style="margin: 10px 0; color: #555;">
                 <strong>Current Date:</strong> ${eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
-                <strong>Current Time:</strong> ${booking.startTime}<br>
-                <strong>Location:</strong> ${booking.location}<br>
-                <strong>Package:</strong> ${booking.package}
+                <strong>Current Time:</strong> ${safeStartTime}<br>
+                <strong>Location:</strong> ${safeLocation}<br>
+                <strong>Package:</strong> ${safePackage}
               </p>
               
               <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
@@ -1647,10 +1696,10 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
               <h3 style="color: #667eea; margin-top: 0;">Your Requested New Date</h3>
               <p style="margin: 10px 0; color: #555;">
                 <strong>Requested Date:</strong> ${new Date(newDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
-                <strong>Requested Time:</strong> ${newTime}
+                <strong>Requested Time:</strong> ${safeNewTime}
               </p>
               
-              ${reason ? `<p style="margin: 15px 0; color: #666;"><strong>Reason:</strong> ${reason}</p>` : ''}
+              ${reason ? `<p style="margin: 15px 0; color: #666;"><strong>Reason:</strong> ${safeReason}</p>` : ''}
             </div>
             
             <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; border-radius: 4px; margin: 20px 0;">
