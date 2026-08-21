@@ -1496,7 +1496,7 @@ app.post('/api/admin/bookings/:id/send-sms', csrfProtection, async (req, res) =>
       message = createMessageTemplate(messageType, {
         clientName: booking.clientName,
         eventType: booking.eventType,
-        eventDate: new Date(booking.eventDate).toLocaleDateString('en-AU'),
+        eventDate: new Date(booking.eventDate).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' }),
         startTime: booking.startTime,
         location: booking.location,
         delayMinutes,
