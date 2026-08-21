@@ -94,13 +94,22 @@
         const originalError = console.error;
         const consoleDiv = document.getElementById('console-log');
 
+        function appendConsoleMessage(message, color) {
+            const entry = document.createElement('div');
+            if (color) {
+                entry.style.color = color;
+            }
+            entry.textContent = message;
+            consoleDiv.appendChild(entry);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
         console.log = function(...args) {
             originalLog.apply(console, args);
             const message = args.map(arg => 
                 typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
             ).join(' ');
-            consoleDiv.innerHTML += `<div>${message}</div>`;
-            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            appendConsoleMessage(message);
         };
 
         console.error = function(...args) {
@@ -108,8 +117,7 @@
             const message = args.map(arg => 
                 typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
             ).join(' ');
-            consoleDiv.innerHTML += `<div style="color: #ff6b6b;">ERROR: ${message}</div>`;
-            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            appendConsoleMessage(`ERROR: ${message}`, '#ff6b6b');
         };
 
         // Log initial check
