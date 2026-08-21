@@ -46,6 +46,11 @@ describe('Twilio SMS Service', () => {
       expect(result).toBe('');
     });
 
+    it('should reject phone numbers with no digits', () => {
+      const result = formatPhoneNumber('---');
+      expect(result).toBe('');
+    });
+
     it('should format US numbers', () => {
       const result = formatPhoneNumber('15551234567');
       expect(result).toBe('+15551234567');

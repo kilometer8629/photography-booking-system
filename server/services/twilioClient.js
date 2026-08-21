@@ -70,6 +70,7 @@ function formatPhoneNumber(phone) {
 
   // Remove all non-digit characters
   let digits = phone.replace(/\D/g, '');
+  if (!digits) return '';
 
   // If starts with '0' (Australian mobile), replace with country code
   if (digits.startsWith('0')) {
