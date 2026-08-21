@@ -438,7 +438,7 @@ const swaggerSpec = swaggerJsdoc({
       version: '1.0.0',
       description: 'API documentation for the Ami Photography booking system'
     },
-    servers: [{ url: process.env.CLIENT_URL || 'http://localhost:3000' }]
+    servers: [{ url: '/' }]
   },
   apis: [path.join(__dirname, 'index.js')]
 });
