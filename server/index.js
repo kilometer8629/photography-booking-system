@@ -1083,7 +1083,7 @@ app.get('/api/admin/check-auth', noCache, (req, res) => {
   }
 });
 
-app.post('/api/admin/login', noCache, async (req, res) => {
+app.post('/api/admin/login', noCache, csrfProtection, async (req, res) => {
   const { username, password } = req.body;
 
   try {
@@ -1741,7 +1741,7 @@ async function sendConfirmationEmail(email, template) {
 }
 
 // Logout
-app.post('/api/admin/logout', (req, res) => {
+app.post('/api/admin/logout', csrfProtection, (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       console.error('Logout error:', err);
