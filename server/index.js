@@ -1377,7 +1377,7 @@ app.get('/api/admin/sms', async (req, res) => {
 });
 
 // Get single SMS message
-app.get('/api/admin/sms/:id', async (req, res) => {
+app.get('/api/admin/sms/:id', isAuthenticated, async (req, res) => {
   try {
     if (!req.params.id || req.params.id === 'undefined') {
       return res.status(400).json({ error: 'Invalid SMS ID' });
