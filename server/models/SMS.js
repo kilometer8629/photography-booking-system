@@ -10,7 +10,7 @@ const SMSSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    maxLength: 20
+    maxLength: 18
   },
   message: {
     type: String,
