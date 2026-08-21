@@ -1855,7 +1855,9 @@ function setupEventListeners() {
         // Alt + 1, 2, etc. to switch sections
         if (e.altKey && e.key >= '1' && e.key <= '9') {
             e.preventDefault();
-            const sections = ['bookings', 'messages', 'sms'];
+            // Derive sections from DOM: assumes each section container has a data-section attribute
+            const sectionElements = document.querySelectorAll('[data-section]');
+            const sections = Array.from(sectionElements).map(el => el.getAttribute('data-section'));
             const index = parseInt(e.key) - 1;
             if (sections[index]) {
                 showSection(sections[index]);
