@@ -237,7 +237,7 @@ const bookedBookings = await Booking.find({
 ### Backend
 - **Runtime:** Node.js v25
 - **Framework:** Express.js
-- **Database:** MongoDB (South Sydney Photography)
+- **Database:** MongoDB (South Photography)
 - **Payment:** Stripe API
 - **Calendar:** Zoho Calendar API v1
 - **Port:** 3000
@@ -340,7 +340,7 @@ const bookedBookings = await Booking.find({
 ## 🔐 Configuration
 
 ### Zoho Calendar
-- **Calendar UID:** `83ce9529c56a45f8b2b0375e74acc648`
+- **Calendar UID:** `83ce9529c56a4cvgrger75e74acc648`
 - **Base URL:** `https://calendar.zoho.com.au`
 - **Timezone:** `Australia/Sydney` (+11:00)
 - **OAuth Scopes:** ZohoCalendar, ZohoBookings
@@ -351,7 +351,7 @@ const bookedBookings = await Booking.find({
 - **Redirect:** Post-checkout success confirmation
 
 ### MongoDB
-- **Connection:** `mongodb://localhost:27017/southsydneyphotography`
+- **Connection:** `mongodb://localhost:27017/southphotography`
 - **Collections:** Users, Bookings, etc.
 
 ---

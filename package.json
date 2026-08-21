@@ -12,7 +12,7 @@
     "build:frontend": "vite build --config vite.config.mjs",
     "build": "npm run build:frontend",
     "mongo": "mongod --dbpath data/db",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "optimize:images": "node optimize-images.js"
   },
   "keywords": [
@@ -33,25 +33,30 @@
     "csrf": "^3.1.0",
     "csurf": "^1.2.2",
     "dotenv": "^16.6.1",
-    "express": "^4.18.2",
+    "express": "^4.22.1",
     "express-rate-limit": "^6.8.1",
     "express-session": "^1.18.1",
     "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
     "luxon": "^3.5.0",
-    "mongoose": "^8.0.3",
-    "morgan": "^1.10.0",
+    "mongoose": "^8.24.1",
+    "morgan": "^1.11.0",
+    "multer": "^2.2.0",
     "node-fetch": "^3.3.2",
-    "nodemailer": "^7.0.10",
+    "nodemailer": "^9.0.1",
+    "pdfkit": "^0.19.1",
     "stripe": "^14.19.0",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1",
     "twilio": "^5.10.3",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
     "concurrently": "^8.0.0",
     "nodemon": "^3.1.0",
-    "sharp": "^0.33.0",
-    "vite": "^7.1.12",
-    "vitest": "^4.0.3"
+    "sharp": "^0.35.0",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.0"
   },
   "overrides": {
     "cookie": "^0.7.2"
