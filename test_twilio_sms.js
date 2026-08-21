@@ -26,9 +26,7 @@ async function runTests() {
     console.log('✅ Twilio is properly configured');
     // Do not log sensitive environment-derived values
     console.log('   Phone Number: [configured]');
-    // Mask Account SID (show first 10 characters only)
-    const accountSid = process.env.TWILIO_ACCOUNT_SID || '';
-    console.log(`   Account SID: ${accountSid.substring(0, 10)}...`);
+    console.log('   Account SID: [configured]');
   } else {
     console.log('❌ Twilio is NOT configured');
     console.log('   Please set the following environment variables:');
