@@ -57,6 +57,7 @@ const {
   sendRescheduleConfirmationSMS,
   sendPaymentConfirmationSMS,
   sendCancellationSMS,
+  maskPhoneNumber,
   twilioEnabled
 } = require('./services/twilioClient');
 
@@ -373,7 +374,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
         if (booking.clientPhone && twilioEnabled) {
           const smsResult = await sendPaymentConfirmationSMS(booking);
           if (smsResult.success) {
-            console.log(`✅ Payment confirmation SMS sent to ${booking.clientPhone}`);
+            console.log(`✅ Payment confirmation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
           } else {
             console.warn(`⚠️ Failed to send payment confirmation SMS: ${smsResult.error}`);
           }
@@ -670,7 +671,7 @@ app.post('/api/create-checkout-session', csrfProtection, async (req, res) => {
     if (customerPhone) {
       const smsResult = await sendBookingConfirmationSMS(bookingDocument);
       if (smsResult.success) {
-        console.log(`✅ Initial booking SMS sent to ${customerPhone}`);
+        console.log(`✅ Initial booking SMS sent to ${maskPhoneNumber(customerPhone)}`);
       } else {
         console.warn(`⚠️ Failed to send initial booking SMS: ${smsResult.error}`);
       }
@@ -945,7 +946,7 @@ app.get('/api/customer/booking', async (req, res) => {
 });
 
 // POST: Reschedule booking
-app.post('/api/customer/reschedule', async (req, res) => {
+app.post('/api/customer/reschedule', csrfProtection, async (req, res) => {
   try {
     const { bookingId, newDate, newTime, reason } = req.body;
 
@@ -980,7 +981,7 @@ app.post('/api/customer/reschedule', async (req, res) => {
     if (booking.clientPhone && twilioEnabled) {
       const smsResult = await sendRescheduleConfirmationSMS(booking, newDate, newTime);
       if (smsResult.success) {
-        console.log(`✅ Reschedule confirmation SMS sent to ${booking.clientPhone}`);
+        console.log(`✅ Reschedule confirmation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
       } else {
         console.warn(`⚠️ Failed to send reschedule SMS: ${smsResult.error}`);
       }
@@ -996,7 +997,7 @@ app.post('/api/customer/reschedule', async (req, res) => {
 });
 
 // POST: Cancel booking
-app.post('/api/customer/cancel', async (req, res) => {
+app.post('/api/customer/cancel', csrfProtection, async (req, res) => {
   try {
     const { bookingId } = req.body;
 
@@ -1048,7 +1049,7 @@ app.post('/api/customer/cancel', async (req, res) => {
     if (booking.clientPhone && twilioEnabled) {
       const smsResult = await sendCancellationSMS(booking, refundAmount, refundReason);
       if (smsResult.success) {
-        console.log(`✅ Cancellation SMS sent to ${booking.clientPhone}`);
+        console.log(`✅ Cancellation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
       } else {
         console.warn(`⚠️ Failed to send cancellation SMS: ${smsResult.error}`);
       }
@@ -1359,7 +1360,7 @@ app.post('/api/admin/bookings/:id/confirm', csrfProtection, async (req, res) => 
     if (booking.clientPhone && twilioEnabled) {
       const smsResult = await sendBookingConfirmationSMS(booking);
       if (smsResult.success) {
-        console.log(`✅ Booking confirmation SMS sent to ${booking.clientPhone}`);
+        console.log(`✅ Booking confirmation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
       } else {
         console.warn(`⚠️ Failed to send booking confirmation SMS: ${smsResult.error}`);
       }
@@ -2179,6 +2180,10 @@ app.get('/api/booking/:id/receipt.pdf', async (req, res) => {
   }
   if (!isAdmin && !clientEmail) {
     return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid booking ID' });
   }
 
   try {

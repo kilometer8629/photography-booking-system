@@ -52,7 +52,7 @@ async function sendSMS(to, message) {
       to: to
     });
 
-    console.log(`✅ SMS sent successfully to ${to}. Message SID: ${result.sid}`);
+    console.log(`✅ SMS sent successfully to ${maskPhoneNumber(to)}. Message SID: ${result.sid}`);
     return { success: true, messageId: result.sid };
   } catch (error) {
     console.error('❌ SMS sending failed:', error.message);
@@ -79,6 +79,12 @@ function formatPhoneNumber(phone) {
 
   // Always format with + prefix
   return '+' + digits;
+}
+
+function maskPhoneNumber(phone) {
+  if (!phone) return '';
+  const visibleDigits = phone.replace(/\D/g, '').slice(-4);
+  return visibleDigits ? `***${visibleDigits}` : '***';
 }
 
 /**
@@ -215,6 +221,7 @@ async function sendBookingReminderSMS(booking) {
 module.exports = {
   sendSMS,
   formatPhoneNumber,
+  maskPhoneNumber,
   sendBookingConfirmationSMS,
   sendBookingStatusChangeSMS,
   sendRescheduleConfirmationSMS,
