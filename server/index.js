@@ -1500,8 +1500,8 @@ app.get('/api/admin/sms/status', async (req, res) => {
   try {
     res.json({
       configured: isTwilioConfigured(),
-      phoneNumber: isTwilioConfigured() ? process.env.TWILIO_PHONE_NUMBER : null,
-      accountSid: isTwilioConfigured() ? process.env.TWILIO_ACCOUNT_SID?.substring(0, 10) + '...' : null
+      phoneNumber: isTwilioConfigured() ? process.env.TWILIO_PHONE_NUMBER?.slice(0, -4).replace(/\d/g, '*') + process.env.TWILIO_PHONE_NUMBER?.slice(-4) : null,
+      accountSid: isTwilioConfigured() ? process.env.TWILIO_ACCOUNT_SID?.substring(0, 6) + '...' : null
     });
   } catch (error) {
     console.error('SMS status check error:', error);

@@ -64,7 +64,7 @@ async function runTests() {
   console.log('⚠️  About to send test SMS messages.');
   // Mask test phone number for security
   const maskedTestPhone = TEST_PHONE.slice(0, -4).replace(/\d/g, '*') + TEST_PHONE.slice(-4);
-  console.log('   Recipient: [REDACTED FOR SECURITY]');
+  console.log(`   Recipient: ${maskedTestPhone}`);
   console.log('   Note: This will use your Twilio credits.\n');
 
   // Test 3: Basic SMS

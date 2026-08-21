@@ -30,7 +30,7 @@ Add these environment variables in your Vercel project settings:
 ### Getting Your Twilio Credentials
 
 1. **Account SID & Auth Token**:
-   - Login to [Twilio Console](https://console.twilio.com)
+   - Log in to [Twilio Console](https://console.twilio.com)
    - Find on main dashboard
    - Click "Show" to reveal Auth Token
 
