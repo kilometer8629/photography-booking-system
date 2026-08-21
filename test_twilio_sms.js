@@ -24,10 +24,8 @@ async function runTests() {
   console.log('Test 1: Checking Twilio Configuration...');
   if (isTwilioConfigured()) {
     console.log('✅ Twilio is properly configured');
-    // Mask phone number for security (show last 4 digits only)
-    const phoneNumber = process.env.TWILIO_PHONE_NUMBER || '';
-    const maskedPhone = phoneNumber.slice(0, -4).replace(/\d/g, '*') + phoneNumber.slice(-4);
-    console.log(`   Phone Number: ${maskedPhone}`);
+    // Do not log sensitive environment-derived values
+    console.log('   Phone Number: [configured]');
     // Mask Account SID (show first 10 characters only)
     const accountSid = process.env.TWILIO_ACCOUNT_SID || '';
     console.log(`   Account SID: ${accountSid.substring(0, 10)}...`);
