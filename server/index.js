@@ -1350,12 +1350,15 @@ app.get('/api/admin/sms', async (req, res) => {
   try {
     const filter = {};
     
-    if (req.query.status) {
+    if (typeof req.query.status === 'string' && req.query.status.trim()) {
       filter.status = req.query.status.toLowerCase();
     }
 
     if (req.query.bookingId) {
-      filter.bookingId = req.query.bookingId;
+      if (typeof req.query.bookingId !== 'string' || !mongoose.Types.ObjectId.isValid(req.query.bookingId)) {
+        return res.status(400).json({ error: 'Invalid bookingId' });
+      }
+      filter.bookingId = new mongoose.Types.ObjectId(req.query.bookingId);
     }
 
     const smsMessages = await SMS.find(filter)
