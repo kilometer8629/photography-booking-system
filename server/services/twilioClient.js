@@ -66,7 +66,7 @@ const sendSMS = async (to, message) => {
 
     // Log success without exposing full phone number
     const maskedPhone = normalizedPhone.slice(0, -4).replace(/\d/g, '*') + normalizedPhone.slice(-4);
-    console.log(`✅ SMS sent successfully to ${maskedPhone}. SID: ${result.sid}`);
+    console.log('✅ SMS sent successfully.');
     return {
       success: true,
       messageSid: result.sid,
