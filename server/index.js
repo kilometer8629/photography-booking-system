@@ -1575,8 +1575,16 @@ app.get('/api/admin/sms/templates', (req, res) => {
   });
 });
 
+// Admin authentication middleware
+function requireAdminAuth(req, res, next) {
+  if (req.session && req.session.user && req.session.user.isAdmin) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
 // Check Twilio configuration status
-app.get('/api/admin/sms/config-status', (req, res) => {
+app.get('/api/admin/sms/config-status', requireAdminAuth, (req, res) => {
   res.json({
     configured: twilioConfigured,
     phoneNumber: twilioConfigured ? process.env.TWILIO_PHONE_NUMBER : null
