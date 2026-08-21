@@ -1,0 +1,1440 @@
+remove @rollup/rollup-linux-x64-musl 4.45.1
+change @rollup/rollup-linux-x64-gnu 4.45.1 => 4.60.4
+change @esbuild/linux-x64 0.25.11 => 0.27.7
+change picomatch 4.0.3 => 4.0.4
+change vite 7.1.12 => 7.3.3
+change picomatch 4.0.3 => 4.0.4
+change uuid 11.1.0 => 11.1.1
+change picomatch 4.0.3 => 4.0.4
+change rollup 4.45.1 => 4.60.4
+change raw-body 2.5.2 => 2.5.3
+add statuses 2.0.2
+change http-errors 2.0.0 => 2.0.1
+change qs 6.13.0 => 6.15.2
+change proxy-from-env 1.1.0 => 2.1.0
+change picomatch 2.3.1 => 2.3.2
+change postcss 8.5.6 => 8.5.15
+change path-to-regexp 0.1.12 => 0.1.13
+change nodemailer 7.0.10 => 7.0.13
+change nanoid 3.3.11 => 3.3.12
+change mongoose 8.16.3 => 8.24.0
+change minimatch 3.1.2 => 3.1.5
+change mongodb 6.17.0 => 6.20.0
+change lodash 4.17.21 => 4.18.1
+change jws 3.2.2 => 3.2.3
+change form-data 4.0.4 => 4.0.5
+change follow-redirects 1.15.11 => 1.16.0
+change express 4.21.2 => 4.22.2
+change esbuild 0.25.11 => 0.27.7
+change body-parser 1.20.3 => 1.20.5
+add statuses 2.0.2
+change http-errors 2.0.0 => 2.0.1
+change brace-expansion 1.1.12 => 1.1.15
+change bn.js 4.12.2 => 4.12.3
+change axios 1.13.0 => 1.16.1
+{
+  "add": [
+    {
+      "name": "statuses",
+      "version": "2.0.2",
+      "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/raw-body/node_modules/statuses"
+    },
+    {
+      "name": "statuses",
+      "version": "2.0.2",
+      "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/body-parser/node_modules/statuses"
+    }
+  ],
+  "added": 2,
+  "audited": 286,
+  "change": [
+    {
+      "from": {
+        "name": "@rollup/rollup-linux-x64-gnu",
+        "version": "4.45.1",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/@rollup/rollup-linux-x64-gnu"
+      },
+      "to": {
+        "name": "@rollup/rollup-linux-x64-gnu",
+        "version": "4.60.4",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/@rollup/rollup-linux-x64-gnu"
+      }
+    },
+    {
+      "from": {
+        "name": "@esbuild/linux-x64",
+        "version": "0.25.11",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/@esbuild/linux-x64"
+      },
+      "to": {
+        "name": "@esbuild/linux-x64",
+        "version": "0.27.7",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/@esbuild/linux-x64"
+      }
+    },
+    {
+      "from": {
+        "name": "picomatch",
+        "version": "4.0.3",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/vitest/node_modules/picomatch"
+      },
+      "to": {
+        "name": "picomatch",
+        "version": "4.0.4",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/vitest/node_modules/picomatch"
+      }
+    },
+    {
+      "from": {
+        "name": "vite",
+        "version": "7.1.12",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/vite"
+      },
+      "to": {
+        "name": "vite",
+        "version": "7.3.3",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/vite"
+      }
+    },
+    {
+      "from": {
+        "name": "picomatch",
+        "version": "4.0.3",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/vite/node_modules/picomatch"
+      },
+      "to": {
+        "name": "picomatch",
+        "version": "4.0.4",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/vite/node_modules/picomatch"
+      }
+    },
+    {
+      "from": {
+        "name": "uuid",
+        "version": "11.1.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/uuid"
+      },
+      "to": {
+        "name": "uuid",
+        "version": "11.1.1",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/uuid"
+      }
+    },
+    {
+      "from": {
+        "name": "picomatch",
+        "version": "4.0.3",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/tinyglobby/node_modules/picomatch"
+      },
+      "to": {
+        "name": "picomatch",
+        "version": "4.0.4",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/tinyglobby/node_modules/picomatch"
+      }
+    },
+    {
+      "from": {
+        "name": "rollup",
+        "version": "4.45.1",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/rollup"
+      },
+      "to": {
+        "name": "rollup",
+        "version": "4.60.4",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/rollup"
+      }
+    },
+    {
+      "from": {
+        "name": "raw-body",
+        "version": "2.5.2",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/raw-body"
+      },
+      "to": {
+        "name": "raw-body",
+        "version": "2.5.3",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/raw-body"
+      }
+    },
+    {
+      "from": {
+        "name": "http-errors",
+        "version": "2.0.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/raw-body/node_modules/http-errors"
+      },
+      "to": {
+        "name": "http-errors",
+        "version": "2.0.1",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/raw-body/node_modules/http-errors"
+      }
+    },
+    {
+      "from": {
+        "name": "qs",
+        "version": "6.13.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/qs"
+      },
+      "to": {
+        "name": "qs",
+        "version": "6.15.2",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/qs"
+      }
+    },
+    {
+      "from": {
+        "name": "proxy-from-env",
+        "version": "1.1.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/proxy-from-env"
+      },
+      "to": {
+        "name": "proxy-from-env",
+        "version": "2.1.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/proxy-from-env"
+      }
+    },
+    {
+      "from": {
+        "name": "picomatch",
+        "version": "2.3.1",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/picomatch"
+      },
+      "to": {
+        "name": "picomatch",
+        "version": "2.3.2",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/picomatch"
+      }
+    },
+    {
+      "from": {
+        "name": "postcss",
+        "version": "8.5.6",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/postcss"
+      },
+      "to": {
+        "name": "postcss",
+        "version": "8.5.15",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/postcss"
+      }
+    },
+    {
+      "from": {
+        "name": "path-to-regexp",
+        "version": "0.1.12",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/path-to-regexp"
+      },
+      "to": {
+        "name": "path-to-regexp",
+        "version": "0.1.13",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/path-to-regexp"
+      }
+    },
+    {
+      "from": {
+        "name": "nodemailer",
+        "version": "7.0.10",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/nodemailer"
+      },
+      "to": {
+        "name": "nodemailer",
+        "version": "7.0.13",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/nodemailer"
+      }
+    },
+    {
+      "from": {
+        "name": "nanoid",
+        "version": "3.3.11",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/nanoid"
+      },
+      "to": {
+        "name": "nanoid",
+        "version": "3.3.12",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/nanoid"
+      }
+    },
+    {
+      "from": {
+        "name": "mongoose",
+        "version": "8.16.3",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/mongoose"
+      },
+      "to": {
+        "name": "mongoose",
+        "version": "8.24.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/mongoose"
+      }
+    },
+    {
+      "from": {
+        "name": "minimatch",
+        "version": "3.1.2",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/minimatch"
+      },
+      "to": {
+        "name": "minimatch",
+        "version": "3.1.5",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/minimatch"
+      }
+    },
+    {
+      "from": {
+        "name": "mongodb",
+        "version": "6.17.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/mongodb"
+      },
+      "to": {
+        "name": "mongodb",
+        "version": "6.20.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/mongodb"
+      }
+    },
+    {
+      "from": {
+        "name": "lodash",
+        "version": "4.17.21",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/lodash"
+      },
+      "to": {
+        "name": "lodash",
+        "version": "4.18.1",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/lodash"
+      }
+    },
+    {
+      "from": {
+        "name": "jws",
+        "version": "3.2.2",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/jws"
+      },
+      "to": {
+        "name": "jws",
+        "version": "3.2.3",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/jws"
+      }
+    },
+    {
+      "from": {
+        "name": "form-data",
+        "version": "4.0.4",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/form-data"
+      },
+      "to": {
+        "name": "form-data",
+        "version": "4.0.5",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/form-data"
+      }
+    },
+    {
+      "from": {
+        "name": "follow-redirects",
+        "version": "1.15.11",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/follow-redirects"
+      },
+      "to": {
+        "name": "follow-redirects",
+        "version": "1.16.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/follow-redirects"
+      }
+    },
+    {
+      "from": {
+        "name": "express",
+        "version": "4.21.2",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/express"
+      },
+      "to": {
+        "name": "express",
+        "version": "4.22.2",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/express"
+      }
+    },
+    {
+      "from": {
+        "name": "esbuild",
+        "version": "0.25.11",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/esbuild"
+      },
+      "to": {
+        "name": "esbuild",
+        "version": "0.27.7",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/esbuild"
+      }
+    },
+    {
+      "from": {
+        "name": "body-parser",
+        "version": "1.20.3",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/body-parser"
+      },
+      "to": {
+        "name": "body-parser",
+        "version": "1.20.5",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/body-parser"
+      }
+    },
+    {
+      "from": {
+        "name": "http-errors",
+        "version": "2.0.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/body-parser/node_modules/http-errors"
+      },
+      "to": {
+        "name": "http-errors",
+        "version": "2.0.1",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/body-parser/node_modules/http-errors"
+      }
+    },
+    {
+      "from": {
+        "name": "brace-expansion",
+        "version": "1.1.12",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/brace-expansion"
+      },
+      "to": {
+        "name": "brace-expansion",
+        "version": "1.1.15",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/brace-expansion"
+      }
+    },
+    {
+      "from": {
+        "name": "bn.js",
+        "version": "4.12.2",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/bn.js"
+      },
+      "to": {
+        "name": "bn.js",
+        "version": "4.12.3",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/bn.js"
+      }
+    },
+    {
+      "from": {
+        "name": "axios",
+        "version": "1.13.0",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/axios"
+      },
+      "to": {
+        "name": "axios",
+        "version": "1.16.1",
+        "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/axios"
+      }
+    }
+  ],
+  "changed": 31,
+  "funding": 52,
+  "remove": [
+    {
+      "name": "@rollup/rollup-linux-x64-musl",
+      "version": "4.45.1",
+      "path": "/tmp/workspace/kilometer8629/photography-booking-system/node_modules/@rollup/rollup-linux-x64-musl"
+    }
+  ],
+  "removed": 1,
+  "audit": {
+    "auditReportVersion": 2,
+    "vulnerabilities": {
+      "axios": {
+        "name": "axios",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1116673,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios has a NO_PROXY Hostname Normalization Bypass that Leads to SSRF",
+            "url": "https://github.com/advisories/GHSA-3p68-rc4w-qgx5",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-441",
+              "CWE-918"
+            ],
+            "cvss": {
+              "score": 4.8,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N"
+            },
+            "range": ">=1.0.0 <1.15.0"
+          },
+          {
+            "source": 1117160,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios HTTP/2 Session Cleanup State Corruption Vulnerability",
+            "url": "https://github.com/advisories/GHSA-qj83-cq47-w5f8",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-400"
+            ],
+            "cvss": {
+              "score": 5.9,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": ">=1.13.0 <1.13.2"
+          },
+          {
+            "source": 1117574,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: Authentication Bypass via Prototype Pollution Gadget in `validateStatus` Merge Strategy",
+            "url": "https://github.com/advisories/GHSA-w9j2-pvgh-6h63",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-287",
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 4.8,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117576,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: Incomplete Fix for CVE-2025-62718 — NO_PROXY Protection Bypassed via RFC 1122 Loopback Subnet (127.0.0.0/8) in Axios 1.15.0",
+            "url": "https://github.com/advisories/GHSA-pmwg-cvhr-8vh7",
+            "severity": "high",
+            "cwe": [
+              "CWE-183",
+              "CWE-441",
+              "CWE-918"
+            ],
+            "cvss": {
+              "score": 7.2,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:L/I:L/A:N"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117577,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: Invisible JSON Response Tampering via Prototype Pollution Gadget in `parseReviver`",
+            "url": "https://github.com/advisories/GHSA-3w6x-2g7m-8v23",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-915",
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 6.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:H/A:N"
+            },
+            "range": ">=1.0.0 <1.15.2"
+          },
+          {
+            "source": 1117580,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: Null Byte Injection via Reverse-Encoding in AxiosURLSearchParams",
+            "url": "https://github.com/advisories/GHSA-xhjh-pmcv-23jw",
+            "severity": "low",
+            "cwe": [
+              "CWE-116",
+              "CWE-626"
+            ],
+            "cvss": {
+              "score": 3.7,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117581,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: CRLF Injection in multipart/form-data body via unsanitized blob.type in formDataToStream",
+            "url": "https://github.com/advisories/GHSA-445q-vr5w-6q77",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-93"
+            ],
+            "cvss": {
+              "score": 5.3,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117583,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: no_proxy bypass via IP alias allows SSRF",
+            "url": "https://github.com/advisories/GHSA-m7pr-hjqh-92cm",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-918"
+            ],
+            "cvss": {
+              "score": 6.8,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:N/A:N"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117585,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: unbounded recursion in toFormData causes DoS via deeply nested request data",
+            "url": "https://github.com/advisories/GHSA-62hf-57xw-28j9",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-674"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117587,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios' HTTP adapter-streamed uploads bypass maxBodyLength when maxRedirects: 0",
+            "url": "https://github.com/advisories/GHSA-5c9x-8gcm-mpgx",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-770"
+            ],
+            "cvss": {
+              "score": 5.3,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117589,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: HTTP adapter streamed responses bypass maxContentLength",
+            "url": "https://github.com/advisories/GHSA-vf2m-468p-8v99",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-770"
+            ],
+            "cvss": {
+              "score": 5.3,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117591,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: Prototype Pollution Gadgets - Response Tampering, Data Exfiltration, and Request Hijacking",
+            "url": "https://github.com/advisories/GHSA-pf86-5x62-jrwf",
+            "severity": "high",
+            "cwe": [
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 7.4,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117593,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: Header Injection via Prototype Pollution",
+            "url": "https://github.com/advisories/GHSA-6chq-wfr3-2hj9",
+            "severity": "high",
+            "cwe": [
+              "CWE-113",
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 7.4,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117595,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios: XSRF Token Cross-Origin Leakage via Prototype Pollution Gadget in `withXSRFToken` Boolean Coercion",
+            "url": "https://github.com/advisories/GHSA-xx6v-rp6x-q39c",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-183",
+              "CWE-201"
+            ],
+            "cvss": {
+              "score": 5.4,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:N"
+            },
+            "range": ">=1.0.0 <1.15.1"
+          },
+          {
+            "source": 1117858,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios is Vulnerable to Denial of Service via __proto__ Key in mergeConfig",
+            "url": "https://github.com/advisories/GHSA-43fc-jf86-j433",
+            "severity": "high",
+            "cwe": [
+              "CWE-754",
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": ">=1.0.0 <=1.13.4"
+          },
+          {
+            "source": 1118607,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios has prototype pollution read-side gadgets in HTTP adapter that allow credential injection and request hijacking",
+            "url": "https://github.com/advisories/GHSA-q8qp-cvcw-x6jj",
+            "severity": "high",
+            "cwe": [
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 7.4,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+            },
+            "range": ">=1.0.0 <1.15.2"
+          },
+          {
+            "source": 1119404,
+            "name": "axios",
+            "dependency": "axios",
+            "title": "Axios has Unrestricted Cloud Metadata Exfiltration via Header Injection Chain",
+            "url": "https://github.com/advisories/GHSA-fvcv-3m26-pcqx",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-113",
+              "CWE-444",
+              "CWE-918"
+            ],
+            "cvss": {
+              "score": 4.8,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N"
+            },
+            "range": ">=1.0.0 <1.15.0"
+          }
+        ],
+        "effects": [],
+        "range": "1.0.0 - 1.15.1",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "bn.js": {
+        "name": "bn.js",
+        "severity": "moderate",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1113442,
+            "name": "bn.js",
+            "dependency": "bn.js",
+            "title": "bn.js affected by an infinite loop",
+            "url": "https://github.com/advisories/GHSA-378v-28hj-76wf",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-835"
+            ],
+            "cvss": {
+              "score": 5.3,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+            },
+            "range": "<4.12.3"
+          }
+        ],
+        "effects": [],
+        "range": "<4.12.3",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "body-parser": {
+        "name": "body-parser",
+        "severity": "moderate",
+        "isDirect": false,
+        "via": [
+          "qs"
+        ],
+        "effects": [
+          "express"
+        ],
+        "range": "1.20.3 - 1.20.4 || 2.0.0-beta.1 - 2.0.2",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "brace-expansion": {
+        "name": "brace-expansion",
+        "severity": "moderate",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1115540,
+            "name": "brace-expansion",
+            "dependency": "brace-expansion",
+            "title": "brace-expansion: Zero-step sequence causes process hang and memory exhaustion",
+            "url": "https://github.com/advisories/GHSA-f886-m6hf-6m8v",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-400"
+            ],
+            "cvss": {
+              "score": 6.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:H"
+            },
+            "range": "<1.1.13"
+          }
+        ],
+        "effects": [],
+        "range": "<1.1.13",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "express": {
+        "name": "express",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          "body-parser",
+          "path-to-regexp",
+          "qs"
+        ],
+        "effects": [],
+        "range": "4.0.0-rc1 - 4.22.1 || 5.0.0-alpha.1 - 5.0.1",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "follow-redirects": {
+        "name": "follow-redirects",
+        "severity": "moderate",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1116560,
+            "name": "follow-redirects",
+            "dependency": "follow-redirects",
+            "title": "follow-redirects leaks Custom Authentication Headers to Cross-Domain Redirect Targets",
+            "url": "https://github.com/advisories/GHSA-r4q5-vmmm-2653",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-200"
+            ],
+            "cvss": {
+              "score": 0,
+              "vectorString": null
+            },
+            "range": "<=1.15.11"
+          }
+        ],
+        "effects": [],
+        "range": "<=1.15.11",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "jws": {
+        "name": "jws",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1111244,
+            "name": "jws",
+            "dependency": "jws",
+            "title": "auth0/node-jws Improperly Verifies HMAC Signature",
+            "url": "https://github.com/advisories/GHSA-869p-cjfg-cm3x",
+            "severity": "high",
+            "cwe": [
+              "CWE-347"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+            },
+            "range": "<3.2.3"
+          }
+        ],
+        "effects": [],
+        "range": "<3.2.3",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "lodash": {
+        "name": "lodash",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1112455,
+            "name": "lodash",
+            "dependency": "lodash",
+            "title": "Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions",
+            "url": "https://github.com/advisories/GHSA-xxjr-mmjv-4gpg",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 6.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:L"
+            },
+            "range": ">=4.0.0 <=4.17.22"
+          },
+          {
+            "source": 1115806,
+            "name": "lodash",
+            "dependency": "lodash",
+            "title": "lodash vulnerable to Code Injection via `_.template` imports key names",
+            "url": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc",
+            "severity": "high",
+            "cwe": [
+              "CWE-94"
+            ],
+            "cvss": {
+              "score": 8.1,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+            },
+            "range": ">=4.0.0 <=4.17.23"
+          },
+          {
+            "source": 1115810,
+            "name": "lodash",
+            "dependency": "lodash",
+            "title": "lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`",
+            "url": "https://github.com/advisories/GHSA-f23m-r3pf-42rh",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 6.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:L"
+            },
+            "range": "<=4.17.23"
+          }
+        ],
+        "effects": [],
+        "range": "<=4.17.23",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "minimatch": {
+        "name": "minimatch",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1113459,
+            "name": "minimatch",
+            "dependency": "minimatch",
+            "title": "minimatch has a ReDoS via repeated wildcards with non-matching literal in pattern",
+            "url": "https://github.com/advisories/GHSA-3ppc-4f35-3m26",
+            "severity": "high",
+            "cwe": [
+              "CWE-1333"
+            ],
+            "cvss": {
+              "score": 0,
+              "vectorString": null
+            },
+            "range": "<3.1.3"
+          },
+          {
+            "source": 1113538,
+            "name": "minimatch",
+            "dependency": "minimatch",
+            "title": "minimatch has ReDoS: matchOne() combinatorial backtracking via multiple non-adjacent GLOBSTAR segments",
+            "url": "https://github.com/advisories/GHSA-7r86-cg39-jmmj",
+            "severity": "high",
+            "cwe": [
+              "CWE-407"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": "<3.1.3"
+          },
+          {
+            "source": 1113546,
+            "name": "minimatch",
+            "dependency": "minimatch",
+            "title": "minimatch ReDoS: nested *() extglobs generate catastrophically backtracking regular expressions",
+            "url": "https://github.com/advisories/GHSA-23c5-xmqv-rm74",
+            "severity": "high",
+            "cwe": [
+              "CWE-1333"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": "<3.1.4"
+          }
+        ],
+        "effects": [],
+        "range": "<=3.1.3",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "mongoose": {
+        "name": "mongoose",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1118997,
+            "name": "mongoose",
+            "dependency": "mongoose",
+            "title": "Mongoose's Improper Sanitization of $nor in sanitizeFilter May Allow NoSQL Injection",
+            "url": "https://github.com/advisories/GHSA-wpg9-53fq-2r8h",
+            "severity": "high",
+            "cwe": [
+              "CWE-74"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+            },
+            "range": ">=8.0.0 <=8.22.0"
+          }
+        ],
+        "effects": [],
+        "range": "8.0.0 - 8.22.0",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "nodemailer": {
+        "name": "nodemailer",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1113165,
+            "name": "nodemailer",
+            "dependency": "nodemailer",
+            "title": "Nodemailer’s addressparser is vulnerable to DoS caused by recursive calls",
+            "url": "https://github.com/advisories/GHSA-rcmh-qjqh-p98v",
+            "severity": "high",
+            "cwe": [
+              "CWE-703"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": "<=7.0.10"
+          },
+          {
+            "source": 1115470,
+            "name": "nodemailer",
+            "dependency": "nodemailer",
+            "title": "Nodemailer has SMTP command injection due to unsanitized `envelope.size` parameter",
+            "url": "https://github.com/advisories/GHSA-c7w3-x93f-qmm8",
+            "severity": "low",
+            "cwe": [
+              "CWE-93"
+            ],
+            "cvss": {
+              "score": 0,
+              "vectorString": null
+            },
+            "range": "<8.0.4"
+          },
+          {
+            "source": 1116270,
+            "name": "nodemailer",
+            "dependency": "nodemailer",
+            "title": "Nodemailer Vulnerable to SMTP Command Injection via CRLF in Transport name Option (EHLO/HELO) ",
+            "url": "https://github.com/advisories/GHSA-vvjj-xcjg-gr5g",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-93"
+            ],
+            "cvss": {
+              "score": 4.9,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:H/A:N"
+            },
+            "range": "<=8.0.4"
+          }
+        ],
+        "effects": [],
+        "range": "<=8.0.4",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "path-to-regexp": {
+        "name": "path-to-regexp",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1115527,
+            "name": "path-to-regexp",
+            "dependency": "path-to-regexp",
+            "title": "path-to-regexp vulnerable to Regular Expression Denial of Service via multiple route parameters",
+            "url": "https://github.com/advisories/GHSA-37ch-88jc-xwx2",
+            "severity": "high",
+            "cwe": [
+              "CWE-1333"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": "<0.1.13"
+          }
+        ],
+        "effects": [
+          "express"
+        ],
+        "range": "<0.1.13",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "picomatch": {
+        "name": "picomatch",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1115549,
+            "name": "picomatch",
+            "dependency": "picomatch",
+            "title": "Picomatch: Method Injection in POSIX Character Classes causes incorrect Glob Matching",
+            "url": "https://github.com/advisories/GHSA-3v7f-55p6-f55p",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 5.3,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+            },
+            "range": "<2.3.2"
+          },
+          {
+            "source": 1115551,
+            "name": "picomatch",
+            "dependency": "picomatch",
+            "title": "Picomatch: Method Injection in POSIX Character Classes causes incorrect Glob Matching",
+            "url": "https://github.com/advisories/GHSA-3v7f-55p6-f55p",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 5.3,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+            },
+            "range": ">=4.0.0 <4.0.4"
+          },
+          {
+            "source": 1115552,
+            "name": "picomatch",
+            "dependency": "picomatch",
+            "title": "Picomatch has a ReDoS vulnerability via extglob quantifiers",
+            "url": "https://github.com/advisories/GHSA-c2c7-rcm5-vvqj",
+            "severity": "high",
+            "cwe": [
+              "CWE-1333"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": "<2.3.2"
+          },
+          {
+            "source": 1115554,
+            "name": "picomatch",
+            "dependency": "picomatch",
+            "title": "Picomatch has a ReDoS vulnerability via extglob quantifiers",
+            "url": "https://github.com/advisories/GHSA-c2c7-rcm5-vvqj",
+            "severity": "high",
+            "cwe": [
+              "CWE-1333"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+            },
+            "range": ">=4.0.0 <4.0.4"
+          }
+        ],
+        "effects": [],
+        "range": "<=2.3.1 || 4.0.0 - 4.0.3",
+        "nodes": [
+          "",
+          "",
+          "",
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "postcss": {
+        "name": "postcss",
+        "severity": "moderate",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1117015,
+            "name": "postcss",
+            "dependency": "postcss",
+            "title": "PostCSS has XSS via Unescaped </style> in its CSS Stringify Output",
+            "url": "https://github.com/advisories/GHSA-qx2v-qp2m-jg93",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-79"
+            ],
+            "cvss": {
+              "score": 6.1,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+            },
+            "range": "<8.5.10"
+          }
+        ],
+        "effects": [],
+        "range": "<8.5.10",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "qs": {
+        "name": "qs",
+        "severity": "moderate",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1113161,
+            "name": "qs",
+            "dependency": "qs",
+            "title": "qs's arrayLimit bypass in comma parsing allows denial of service",
+            "url": "https://github.com/advisories/GHSA-w7fw-mjwx-w883",
+            "severity": "low",
+            "cwe": [
+              "CWE-20"
+            ],
+            "cvss": {
+              "score": 3.7,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L"
+            },
+            "range": ">=6.7.0 <=6.14.1"
+          },
+          {
+            "source": 1113719,
+            "name": "qs",
+            "dependency": "qs",
+            "title": "qs's arrayLimit bypass in its bracket notation allows DoS via memory exhaustion",
+            "url": "https://github.com/advisories/GHSA-6rw7-vpxm-498p",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-20"
+            ],
+            "cvss": {
+              "score": 3.7,
+              "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L"
+            },
+            "range": "<6.14.1"
+          },
+          {
+            "source": 1119502,
+            "name": "qs",
+            "dependency": "qs",
+            "title": "qs has a remotely triggerable DoS: qs.stringify crashes with TypeError on null/undefined entries in comma-format arrays when encodeValuesOnly is set",
+            "url": "https://github.com/advisories/GHSA-q8mj-m7cp-5q26",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-476"
+            ],
+            "cvss": {
+              "score": 5.3,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+            },
+            "range": ">=6.11.1 <=6.15.1"
+          }
+        ],
+        "effects": [
+          "body-parser",
+          "express"
+        ],
+        "range": "<=6.15.1",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "rollup": {
+        "name": "rollup",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1113515,
+            "name": "rollup",
+            "dependency": "rollup",
+            "title": "Rollup 4 has Arbitrary File Write via Path Traversal",
+            "url": "https://github.com/advisories/GHSA-mw96-cpmx-2vgc",
+            "severity": "high",
+            "cwe": [
+              "CWE-22"
+            ],
+            "cvss": {
+              "score": 0,
+              "vectorString": null
+            },
+            "range": ">=4.0.0 <4.59.0"
+          }
+        ],
+        "effects": [],
+        "range": "4.0.0 - 4.58.0",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "uuid": {
+        "name": "uuid",
+        "severity": "moderate",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1119441,
+            "name": "uuid",
+            "dependency": "uuid",
+            "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+            "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-787",
+              "CWE-1285"
+            ],
+            "cvss": {
+              "score": 7.5,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+            },
+            "range": "<11.1.1"
+          }
+        ],
+        "effects": [],
+        "range": "<11.1.1",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      },
+      "vite": {
+        "name": "vite",
+        "severity": "high",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1116230,
+            "name": "vite",
+            "dependency": "vite",
+            "title": "Vite Vulnerable to Path Traversal in Optimized Deps `.map` Handling",
+            "url": "https://github.com/advisories/GHSA-4w7w-66w2-5vf9",
+            "severity": "moderate",
+            "cwe": [
+              "CWE-22",
+              "CWE-200"
+            ],
+            "cvss": {
+              "score": 0,
+              "vectorString": null
+            },
+            "range": ">=7.0.0 <=7.3.1"
+          },
+          {
+            "source": 1116232,
+            "name": "vite",
+            "dependency": "vite",
+            "title": "Vite: `server.fs.deny` bypassed with queries",
+            "url": "https://github.com/advisories/GHSA-v2wj-q39q-566r",
+            "severity": "high",
+            "cwe": [
+              "CWE-180",
+              "CWE-284"
+            ],
+            "cvss": {
+              "score": 0,
+              "vectorString": null
+            },
+            "range": ">=7.1.0 <=7.3.1"
+          },
+          {
+            "source": 1116235,
+            "name": "vite",
+            "dependency": "vite",
+            "title": "Vite Vulnerable to Arbitrary File Read via Vite Dev Server WebSocket",
+            "url": "https://github.com/advisories/GHSA-p9ff-h696-f583",
+            "severity": "high",
+            "cwe": [
+              "CWE-200",
+              "CWE-306"
+            ],
+            "cvss": {
+              "score": 0,
+              "vectorString": null
+            },
+            "range": ">=7.0.0 <=7.3.1"
+          }
+        ],
+        "effects": [],
+        "range": "7.0.0 - 7.3.1",
+        "nodes": [
+          ""
+        ],
+        "fixAvailable": true
+      }
+    },
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 7,
+        "high": 11,
+        "critical": 0,
+        "total": 18
+      },
+      "dependencies": {
+        "prod": 178,
+        "dev": 108,
+        "optional": 6,
+        "peer": 0,
+        "peerOptional": 0,
+        "total": 285
+      }
+    }
+  }
+}
