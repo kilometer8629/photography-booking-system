@@ -5,3 +5,5 @@ server/data/db/
 dist/
 .env.local
 .vercel
+uploads/
+.npm-audit*.json
