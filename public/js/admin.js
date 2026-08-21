@@ -1973,12 +1973,39 @@ async function viewSMSDetails(smsId) {
         
         const sms = await response.json();
         
-        showNotification(`SMS Details:\n\nTo: ${sms.phoneNumber}\nRecipient: ${sms.recipientName}\nType: ${sms.messageType}\nStatus: ${sms.status}\n\nMessage:\n${sms.message}`, 'info');
+        showSMSDetailsModal(sms);
     } catch (error) {
         showNotification('Failed to load SMS details', 'error');
     }
 }
 
+// Show SMS Details Modal
+function showSMSDetailsModal(sms) {
+    const modal = safeGetElement('sms-details-modal');
+    if (!modal) return;
+
+    // Populate modal fields
+    const phoneElem = safeGetElement('sms-details-phone');
+    const recipientElem = safeGetElement('sms-details-recipient');
+    const typeElem = safeGetElement('sms-details-type');
+    const statusElem = safeGetElement('sms-details-status');
+    const sentAtElem = safeGetElement('sms-details-sentat');
+    const messageElem = safeGetElement('sms-details-message');
+
+    if (phoneElem) phoneElem.textContent = sms.phoneNumber || '-';
+    if (recipientElem) recipientElem.textContent = sms.recipientName || '-';
+    if (typeElem) typeElem.textContent = sms.messageType || '-';
+    if (statusElem) statusElem.textContent = sms.status || '-';
+    if (sentAtElem) sentAtElem.textContent = sms.sentAt ? new Date(sms.sentAt).toLocaleString() : '-';
+    if (messageElem) messageElem.textContent = sms.message || '-';
+
+    modal.classList.remove('hidden');
+}
+
+function closeSMSDetailsModal() {
+    const modal = safeGetElement('sms-details-modal');
+    if (modal) modal.classList.add('hidden');
+}
 function openSMSModal(bookingId = null) {
     const modal = safeGetElement('sms-modal');
     if (!modal) return;
