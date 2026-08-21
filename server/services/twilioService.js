@@ -38,9 +38,15 @@ async function sendSMS(to, message) {
 
   // Clean phone number - ensure it starts with + for international format
   let cleanedPhone = to.trim().replace(/\s/g, '');
-  if (!cleanedPhone.startsWith('+')) {
-    // Assume Australian number if no country code
+  if (cleanedPhone.startsWith('+')) {
+    // Already in E.164 format
+    // do nothing
+  } else if (cleanedPhone.startsWith('0')) {
+    // Assume Australian number if starts with 0
     cleanedPhone = cleanedPhone.replace(/^0/, '+61');
+  } else {
+    // Invalid format: missing country code and leading zero
+    throw new Error('Invalid phone number format. Please provide number in E.164 format (e.g., +61412345678) or with a leading 0 for Australian numbers.');
   }
 
   try {
