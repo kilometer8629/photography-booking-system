@@ -438,7 +438,7 @@ const swaggerSpec = swaggerJsdoc({
       version: '1.0.0',
       description: 'API documentation for the Ami Photography booking system'
     },
-    servers: [{ url: process.env.CLIENT_URL || 'http://localhost:3000' }]
+    servers: [{ url: '/' }]
   },
   apis: [path.join(__dirname, 'index.js')]
 });
@@ -1160,7 +1160,7 @@ app.get('/api/admin/check-auth', noCache, (req, res) => {
   }
 });
 
-app.post('/api/admin/login', noCache, async (req, res) => {
+app.post('/api/admin/login', noCache, csrfProtection, async (req, res) => {
   const { username, password } = req.body;
 
   try {
@@ -1538,39 +1538,15 @@ const getBookingEmailTemplate = (name, formData) => {
   return {
     subject: 'Booking Request Confirmation - Ami Photography',
     html: renderTemplate('booking', {
-      name,
-      eventType: formData.eventType,
+      name: safeName,
+      eventType: safeEventType,
       date: new Date(formData.date).toLocaleDateString(),
-      startTime: formData.startTime,
-      endTime: formData.endTime,
-      location: formData.location,
-      package: formData.package,
-      details: formData.details || 'None'
+      startTime: safeStartTime,
+      endTime: safeEndTime,
+      location: safeLocation,
+      package: safePackage,
+      details: safeDetails
     })
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Hi ${safeName},</h2>
-          <p>Thank you for your booking request! We're thrilled that you've chosen Ami Photography for your special event.</p>
-          
-          <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
-            <h3>Your Booking Details:</h3>
-            <p><strong>Event Type:</strong> ${safeEventType}</p>
-            <p><strong>Date:</strong> ${new Date(formData.date).toLocaleDateString()}</p>
-            <p><strong>Time:</strong> ${safeStartTime} - ${safeEndTime}</p>
-            <p><strong>Location:</strong> ${safeLocation}</p>
-            <p><strong>Package:</strong> ${safePackage}</p>
-            <p><strong>Additional Notes:</strong> ${safeDetails}</p>
-          </div>
-          
-          <p>We'll review your request and get back to you within 24-48 hours to confirm availability and discuss any details.</p>
-          <p>If you have any urgent questions, please don't hesitate to contact us directly.</p>
-          
-          <p>Looking forward to capturing your special moments!<br>
-          <strong>The Ami Photography Team</strong><br>
-          📞 (123) 456-7890<br>
-          ✉️ info@amiphotography.com</p>
-        </div>
-      `
   };
 };
 
@@ -1828,7 +1804,7 @@ async function sendConfirmationEmail(email, template) {
 }
 
 // Logout
-app.post('/api/admin/logout', (req, res) => {
+app.post('/api/admin/logout', csrfProtection, (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       console.error('Logout error:', err);
@@ -2048,6 +2024,9 @@ app.post('/api/client/login', async (req, res) => {
 });
 
 const authenticateClient = (req, res, next) => {
+  if (!JWT_SECRET) {
+    return res.status(503).json({ error: 'Client authentication is not configured' });
+  }
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authentication required' });
