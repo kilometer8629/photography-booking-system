@@ -48,7 +48,7 @@ async function sendSMS(to, message) {
       to: cleanedPhone
     });
 
-    console.log(`✅ SMS sent successfully to ${cleanedPhone}. SID: ${result.sid}`);
+    console.log('✅ SMS sent successfully to %s. SID: %s', cleanedPhone, result.sid);
     return {
       success: true,
       sid: result.sid,
@@ -57,7 +57,7 @@ async function sendSMS(to, message) {
       sentAt: new Date()
     };
   } catch (error) {
-    console.error(`❌ Failed to send SMS to ${cleanedPhone}:`, error.message);
+    console.error('❌ Failed to send SMS to %s: %s', cleanedPhone, error.message);
     throw new Error(`SMS sending failed: ${error.message}`);
   }
 }
@@ -84,7 +84,7 @@ async function getSMSStatus(messageSid) {
       dateSent: message.dateSent
     };
   } catch (error) {
-    console.error(`❌ Failed to fetch SMS status for ${messageSid}:`, error.message);
+    console.error('❌ Failed to fetch SMS status for %s: %s', messageSid, error.message);
     throw new Error(`Failed to fetch SMS status: ${error.message}`);
   }
 }
