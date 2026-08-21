@@ -2010,7 +2010,7 @@ async function loadBookingsForSMS() {
         if (!select) return;
         
         const options = bookings.map(booking => {
-            const date = new Date(booking.eventDate).toLocaleDateString();
+            const date = new Date(booking.eventDate).toLocaleDateString('en-AU');
             return `<option value="${booking._id}">${booking.clientName} - ${date} ${booking.startTime}</option>`;
         }).join('');
         
