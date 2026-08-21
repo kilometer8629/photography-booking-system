@@ -109,7 +109,8 @@ const normalizePhoneNumber = (phone) => {
       cleaned = '+' + cleaned;
     }
   } else {
-    cleaned = phone;
+    // Keep '+' but strip any other formatting characters
+    cleaned = '+' + phone.slice(1).replace(/\D/g, '');
   }
 
   return cleaned;
