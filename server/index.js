@@ -1972,7 +1972,7 @@ const upload = multer({
   }
 });
 
-app.post('/api/upload', authenticate, upload.single('file'), (req, res) => {
+app.post('/api/upload', authenticate, csrfProtection, upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
@@ -2016,7 +2016,7 @@ const JWT_SECRET = process.env.SESSION_SECRET || (() => {
   return '';
 })();
 
-app.post('/api/client/login', async (req, res) => {
+app.post('/api/client/login', csrfProtection, async (req, res) => {
   const { email } = req.body;
   if (!email) {
     return res.status(400).json({ error: 'Email is required' });
@@ -2102,7 +2102,7 @@ app.get('/api/client/bookings', authenticateClient, async (req, res) => {
  *       404:
  *         description: Booking not found
  */
-app.post('/api/admin/refund', authenticate, async (req, res) => {
+app.post('/api/admin/refund', authenticate, csrfProtection, async (req, res) => {
   const { bookingId, amount } = req.body;
 
   if (!bookingId || typeof bookingId !== 'string') {
