@@ -36,16 +36,8 @@ async function sendSMS(to, message) {
     throw new Error('Phone number and message are required');
   }
 
-  // Clean phone number - ensure it starts with + for international format
-  let cleanedPhone = to.trim().replace(/\s/g, '');
-  if (cleanedPhone.startsWith('+')) {
-    // Already in E.164 format
-    // do nothing
-  } else if (cleanedPhone.startsWith('0')) {
-    // Assume Australian number if starts with 0
-    cleanedPhone = cleanedPhone.replace(/^0/, '+61');
-  } else {
-    // Invalid format: missing country code and leading zero
+  const cleanedPhone = formatPhoneNumber(to);
+  if (cleanedPhone === '+61') {
     throw new Error('Invalid phone number format. Please provide number in E.164 format (e.g., +61412345678) or with a leading 0 for Australian numbers.');
   }
 
@@ -119,9 +111,29 @@ function createMessageTemplate(type, data = {}) {
   return templates[type] || data.customMessage || '';
 }
 
+function formatPhoneNumber(phoneNumber = '') {
+  const rawPhone = String(phoneNumber).trim();
+  const digits = rawPhone.replace(/\D/g, '');
+
+  if (rawPhone.startsWith('+')) {
+    return `+${digits}`;
+  }
+
+  if (digits.startsWith('0')) {
+    return `+61${digits.substring(1)}`;
+  }
+
+  if (digits.startsWith('61')) {
+    return `+${digits}`;
+  }
+
+  return `+61${digits}`;
+}
+
 module.exports = {
   sendSMS,
   getSMSStatus,
   createMessageTemplate,
+  formatPhoneNumber,
   twilioConfigured
 };
