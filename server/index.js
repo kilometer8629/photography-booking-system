@@ -1418,6 +1418,12 @@ app.post('/api/admin/bookings/:id/send-reminder', csrfProtection, async (req, re
     // Calculate days until event
     const eventDate = new Date(booking.eventDate);
     const today = new Date();
+
+    // Guard against past events to avoid negative daysUntil and confusing reminders
+    if (eventDate < today) {
+      return res.status(400).json({ error: 'Cannot send reminder for past events' });
+    }
+
     const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
 
     const smsResult = await sendBookingReminderSMS(booking, daysUntil);
