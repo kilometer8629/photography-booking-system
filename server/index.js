@@ -1412,7 +1412,8 @@ const sanitizeEmailValue = (value) =>
 const ALLOWED_EMAIL_CURRENCIES = new Set(['$', '€', '£', '¥', '₹', 'USD', 'EUR', 'GBP', 'AUD', 'CAD']);
 
 const sanitizeCurrencyValue = (value) => {
-  const currency = String(value ?? '$').trim();
+  const raw = String(value ?? '$').trim();
+  const currency = raw.length === 3 ? raw.toUpperCase() : raw;
   return ALLOWED_EMAIL_CURRENCIES.has(currency) ? currency : '$';
 };
 
