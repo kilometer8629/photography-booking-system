@@ -1415,16 +1415,18 @@ app.post('/api/admin/bookings/:id/send-reminder', csrfProtection, async (req, re
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    // Calculate days until event
-    const eventDate = new Date(booking.eventDate);
-    const today = new Date();
+    // Calculate days until event using date-only comparison to avoid
+    // off-by-one errors caused by time-of-day or timezone differences.
+    const eventDateStr = new Date(booking.eventDate).toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0];
 
     // Guard against past events to avoid negative daysUntil and confusing reminders
-    if (eventDate < today) {
+    if (eventDateStr < todayStr) {
       return res.status(400).json({ error: 'Cannot send reminder for past events' });
     }
 
-    const daysUntil = Math.ceil((eventDate - today) / (1000 * 60 * 60 * 24));
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const daysUntil = Math.round((new Date(eventDateStr) - new Date(todayStr)) / msPerDay);
 
     const smsResult = await sendBookingReminderSMS(booking, daysUntil);
 
