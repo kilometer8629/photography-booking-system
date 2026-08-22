@@ -11,7 +11,7 @@ You asked to complete the GitHub update and Vercel connection. Here's exactly wh
 ### Phase 1: Git Setup (5 min)
 **PowerShell Commands:**
 ```powershell
-cd "c:\Users\amy\Downloads\PhotographyBooking-main\PhotographyBooking-main"
+cd "c:\Users\YOUR_USERNAME\Downloads\PhotographyBooking-main\PhotographyBooking-main"
 git init
 git add .
 git commit -m "Initial commit - Photography Booking System ready for Vercel"
@@ -101,7 +101,7 @@ Open and follow these files for detailed instructions!
 ### Commands to Run in PowerShell
 ```powershell
 # Phase 1: Initialize Git
-cd "c:\Users\amy\Downloads\PhotographyBooking-main\PhotographyBooking-main"
+cd "c:\Users\YOUR_USERNAME\Downloads\PhotographyBooking-main\PhotographyBooking-main"
 git init
 git add .
 git commit -m "Initial commit - ready for Vercel"

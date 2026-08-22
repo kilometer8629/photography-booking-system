@@ -13,6 +13,34 @@ const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const cookieParser = require('cookie-parser');
 const { DateTime } = require('luxon');
+const { validateEnv } = require('./utils/validateEnv');
+const { renderTemplate } = require('./utils/templateRenderer');
+
+// ===== Environment Validation =====
+try {
+  validateEnv();
+} catch (err) {
+  console.error(err.message);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
+
+// ===== Sentry Error Monitoring (optional) =====
+let Sentry;
+if (process.env.SENTRY_DSN) {
+  try {
+    Sentry = require('@sentry/node');
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.NODE_ENV || 'development',
+      tracesSampleRate: 0.2
+    });
+    console.log('✅ Sentry error monitoring initialised');
+  } catch (sentryError) {
+    console.warn('⚠️ Sentry SDK not installed. Run `npm install @sentry/node` to enable error monitoring.');
+  }
+}
 const {
   getAvailabilityForDate,
   getAvailabilityForRange,
@@ -25,6 +53,7 @@ const { buildSlotsForDay, filterSlots } = require('./utils/slots');
 const Stripe = require('stripe');
 const {
   sendBookingConfirmationSMS,
+<<<<<<< HEAD
   sendPaymentConfirmationSMS,
   sendRescheduleNotificationSMS,
   sendCancellationSMS,
@@ -37,9 +66,19 @@ const maskPhoneNumber = (phone) => {
   if (!phone || phone.length < 4) return '***';
   return phone.slice(0, -4).replace(/\d/g, '*') + phone.slice(-4);
 };
+=======
+  sendBookingStatusChangeSMS,
+  sendRescheduleConfirmationSMS,
+  sendPaymentConfirmationSMS,
+  sendCancellationSMS,
+  maskPhoneNumber,
+  twilioEnabled
+} = require('./services/twilioClient');
+>>>>>>> origin/main
 
 // ===== Import Models =====
-const { Booking, Message, Admin } = require('./models');
+const { Booking, Message, Admin, SMS } = require('./models');
+const { sendSMS, createMessageTemplate, twilioConfigured } = require('./services/twilioService');
 
 const app = express();
 
@@ -355,7 +394,11 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
         }
 
         // Send payment confirmation SMS
+<<<<<<< HEAD
         if (booking.clientPhone && isTwilioConfigured()) {
+=======
+        if (booking.clientPhone && twilioEnabled) {
+>>>>>>> origin/main
           const smsResult = await sendPaymentConfirmationSMS(booking);
           if (smsResult.success) {
             console.log(`✅ Payment confirmation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
@@ -410,6 +453,24 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
 // ===== Body Parsers =====
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ===== Swagger API Documentation =====
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+
+const swaggerSpec = swaggerJsdoc({
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Photography Booking System API',
+      version: '1.0.0',
+      description: 'API documentation for the Ami Photography booking system'
+    },
+    servers: [{ url: '/' }]
+  },
+  apis: [path.join(__dirname, 'index.js')]
+});
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ===== Static Files =====
 app.use(express.static(path.join(__dirname, '../public'), {
@@ -633,6 +694,16 @@ app.post('/api/create-checkout-session', csrfProtection, async (req, res) => {
       estimatedCost: priceInfo?.amount ? priceInfo.amount / 100 : undefined
     });
 
+    // Send initial booking confirmation SMS (booking created, payment pending)
+    if (customerPhone) {
+      const smsResult = await sendBookingConfirmationSMS(bookingDocument);
+      if (smsResult.success) {
+        console.log(`✅ Initial booking SMS sent to ${maskPhoneNumber(customerPhone)}`);
+      } else {
+        console.warn(`⚠️ Failed to send initial booking SMS: ${smsResult.error}`);
+      }
+    }
+
     res.json({ url: session.url });
   } catch (error) {
     console.error('Stripe checkout error:', error);
@@ -654,6 +725,27 @@ app.post('/api/create-checkout-session', csrfProtection, async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/availability:
+ *   get:
+ *     summary: Get available time slots
+ *     tags: [Booking]
+ *     parameters:
+ *       - in: query
+ *         name: date
+ *         schema: { type: string, format: date }
+ *         description: Single date (YYYY-MM-DD)
+ *       - in: query
+ *         name: start
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: end
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Available slots
+ */
 app.get('/api/availability', async (req, res) => {
   try {
     const { date, start, end } = req.query || {};
@@ -757,6 +849,16 @@ app.get('/api/availability', async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/packages:
+ *   get:
+ *     summary: List available photography packages with pricing
+ *     tags: [Booking]
+ *     responses:
+ *       200:
+ *         description: Package catalog
+ */
 app.get('/api/packages', async (req, res) => {
   try {
     const packages = await Promise.all(packageCatalog.map(async (pkg) => {
@@ -871,7 +973,7 @@ app.get('/api/customer/booking', async (req, res) => {
 });
 
 // POST: Reschedule booking
-app.post('/api/customer/reschedule', async (req, res) => {
+app.post('/api/customer/reschedule', csrfProtection, async (req, res) => {
   try {
     const { bookingId, newDate, newTime, reason } = req.body;
 
@@ -902,11 +1004,19 @@ app.post('/api/customer/reschedule', async (req, res) => {
     const rescheduleTemplate = getRescheduleEmailTemplate(booking, newDate, newTime, reason);
     await sendConfirmationEmail(booking.clientEmail, rescheduleTemplate);
 
+<<<<<<< HEAD
     // Send reschedule SMS notification
     if (booking.clientPhone && isTwilioConfigured()) {
       const smsResult = await sendRescheduleNotificationSMS(booking, newDate, newTime);
       if (smsResult.success) {
         console.log(`✅ Reschedule SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
+=======
+    // Send reschedule confirmation SMS
+    if (booking.clientPhone && twilioEnabled) {
+      const smsResult = await sendRescheduleConfirmationSMS(booking, newDate, newTime);
+      if (smsResult.success) {
+        console.log(`✅ Reschedule confirmation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
+>>>>>>> origin/main
       } else {
         console.warn(`⚠️ Failed to send reschedule SMS: ${smsResult.error}`);
       }
@@ -922,7 +1032,7 @@ app.post('/api/customer/reschedule', async (req, res) => {
 });
 
 // POST: Cancel booking
-app.post('/api/customer/cancel', async (req, res) => {
+app.post('/api/customer/cancel', csrfProtection, async (req, res) => {
   try {
     const { bookingId } = req.body;
 
@@ -970,9 +1080,15 @@ app.post('/api/customer/cancel', async (req, res) => {
     const cancellationTemplate = getCancellationEmailTemplate(booking, refundAmount, refundReason);
     await sendConfirmationEmail(booking.clientEmail, cancellationTemplate);
 
+<<<<<<< HEAD
     // Send cancellation SMS notification
     if (booking.clientPhone && isTwilioConfigured()) {
       const smsResult = await sendCancellationSMS(booking, refundAmount);
+=======
+    // Send cancellation SMS
+    if (booking.clientPhone && twilioEnabled) {
+      const smsResult = await sendCancellationSMS(booking, refundAmount, refundReason);
+>>>>>>> origin/main
       if (smsResult.success) {
         console.log(`✅ Cancellation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
       } else {
@@ -1097,7 +1213,7 @@ app.get('/api/admin/check-auth', noCache, (req, res) => {
   }
 });
 
-app.post('/api/admin/login', noCache, async (req, res) => {
+app.post('/api/admin/login', noCache, csrfProtection, async (req, res) => {
   const { username, password } = req.body;
 
   try {
@@ -1282,6 +1398,16 @@ app.post('/api/admin/bookings/:id/confirm', csrfProtection, async (req, res) => 
 
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
+    // Send booking confirmation SMS
+    if (booking.clientPhone && twilioEnabled) {
+      const smsResult = await sendBookingConfirmationSMS(booking);
+      if (smsResult.success) {
+        console.log(`✅ Booking confirmation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
+      } else {
+        console.warn(`⚠️ Failed to send booking confirmation SMS: ${smsResult.error}`);
+      }
+    }
+
     res.json({
       ...booking.toObject(),
       csrfToken: req.csrfToken() // Send new token
@@ -1394,6 +1520,7 @@ app.post('/api/admin/messages/:id/mark-read', csrfProtection, async (req, res) =
   }
 });
 
+<<<<<<< HEAD
 // ===== SMS Notification Endpoints =====
 
 // Send booking reminder SMS
@@ -1406,12 +1533,141 @@ app.post('/api/admin/bookings/:id/send-reminder', csrfProtection, async (req, re
     if (!isTwilioConfigured()) {
       return res.status(503).json({ 
         error: 'SMS service not configured',
+=======
+// ===== SMS Management Routes =====
+
+// Get all SMS messages
+app.get('/api/admin/sms', async (req, res) => {
+  try {
+    const filter = {};
+    
+    if (typeof req.query.status === 'string' && req.query.status.trim()) {
+      filter.status = req.query.status.toLowerCase();
+    }
+
+    if (req.query.bookingId) {
+      if (typeof req.query.bookingId !== 'string' || !mongoose.Types.ObjectId.isValid(req.query.bookingId)) {
+        return res.status(400).json({ error: 'Invalid bookingId' });
+      }
+      filter.bookingId = new mongoose.Types.ObjectId(req.query.bookingId);
+    }
+
+    const smsMessages = await SMS.find(filter)
+      .populate('bookingId', 'clientName clientEmail eventDate startTime')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Transform _id to id for frontend compatibility
+    const transformedSMS = smsMessages.map(sms => ({
+      ...sms,
+      id: sms._id?.toString() || sms._id
+    }));
+
+    res.json(transformedSMS);
+  } catch (error) {
+    console.error('Fetch SMS messages error:', error);
+    res.status(500).json({ error: 'Failed to fetch SMS messages' });
+  }
+});
+
+// Get single SMS message
+app.get('/api/admin/sms/:id', isAuthenticated, async (req, res) => {
+  try {
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ error: 'Invalid SMS ID' });
+    }
+
+    const sms = await SMS.findById(req.params.id)
+      .populate('bookingId', 'clientName clientEmail eventDate startTime location');
+    
+    if (!sms) return res.status(404).json({ error: 'SMS not found' });
+    res.json(sms);
+  } catch (error) {
+    console.error('Fetch SMS error:', error);
+    res.status(500).json({ error: 'Failed to fetch SMS' });
+  }
+});
+
+// Send SMS
+app.post('/api/admin/sms/send', csrfProtection, async (req, res) => {
+  try {
+    const { bookingId, phoneNumber, message, messageType, recipientName } = req.body;
+
+    if (!phoneNumber || !message) {
+      return res.status(400).json({ 
+        error: 'Phone number and message are required',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    if (!twilioConfigured) {
+      return res.status(503).json({ 
+        error: 'SMS service is not configured. Please configure Twilio settings.',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    // Create SMS record
+    const smsRecord = new SMS({
+      bookingId: bookingId || null,
+      phoneNumber,
+      message,
+      messageType: messageType || 'custom',
+      recipientName: recipientName || 'Customer',
+      sentBy: req.session.admin.username,
+      status: 'pending'
+    });
+
+    // Send SMS via Twilio
+    try {
+      const result = await sendSMS(phoneNumber, message);
+      
+      smsRecord.status = 'sent';
+      smsRecord.twilioSid = result.sid;
+      smsRecord.sentAt = result.sentAt;
+      
+      await smsRecord.save();
+
+      res.json({
+        success: true,
+        message: 'SMS sent successfully',
+        sms: smsRecord,
+        csrfToken: req.csrfToken()
+      });
+    } catch (twilioError) {
+      smsRecord.status = 'failed';
+      smsRecord.errorMessage = twilioError.message;
+      await smsRecord.save();
+
+      res.status(500).json({
+        success: false,
+        error: `Failed to send SMS: ${twilioError.message}`,
+        csrfToken: req.csrfToken()
+      });
+    }
+  } catch (error) {
+    console.error('Send SMS error:', error);
+    res.status(500).json({
+      error: 'Failed to process SMS request',
+      csrfToken: req.csrfToken()
+    });
+  }
+});
+
+// Send SMS to booking customer
+app.post('/api/admin/bookings/:id/send-sms', csrfProtection, async (req, res) => {
+  try {
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ 
+        error: 'Invalid booking ID',
+>>>>>>> origin/main
         csrfToken: req.csrfToken()
       });
     }
 
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
+<<<<<<< HEAD
       return res.status(404).json({ error: 'Booking not found' });
     }
 
@@ -1463,10 +1719,24 @@ app.post('/api/admin/bookings/:id/send-confirmation-sms', csrfProtection, async 
     if (!isTwilioConfigured()) {
       return res.status(503).json({ 
         error: 'SMS service not configured',
+=======
+      return res.status(404).json({ 
+        error: 'Booking not found',
         csrfToken: req.csrfToken()
       });
     }
 
+    const { messageType, customMessage, delayMinutes, newDate, newTime } = req.body;
+
+    if (!twilioConfigured) {
+      return res.status(503).json({ 
+        error: 'SMS service is not configured',
+>>>>>>> origin/main
+        csrfToken: req.csrfToken()
+      });
+    }
+
+<<<<<<< HEAD
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -1485,18 +1755,86 @@ app.post('/api/admin/bookings/:id/send-confirmation-sms', csrfProtection, async 
       res.status(500).json({
         success: false,
         error: smsResult.error,
+=======
+    // Create message from template or use custom message
+    let message;
+    if (messageType && messageType !== 'custom') {
+      message = createMessageTemplate(messageType, {
+        clientName: booking.clientName,
+        eventType: booking.eventType,
+        eventDate: new Date(booking.eventDate).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' }),
+        startTime: booking.startTime,
+        location: booking.location,
+        delayMinutes,
+        newDate,
+        newTime
+      });
+    } else {
+      message = customMessage;
+    }
+
+    if (!message) {
+      return res.status(400).json({ 
+        error: 'Message content is required',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    // Create SMS record
+    const smsRecord = new SMS({
+      bookingId: booking._id,
+      phoneNumber: booking.clientPhone,
+      message,
+      messageType: messageType || 'custom',
+      recipientName: booking.clientName,
+      sentBy: req.session.admin.username,
+      status: 'pending'
+    });
+
+    // Send SMS via Twilio
+    try {
+      const result = await sendSMS(booking.clientPhone, message);
+      
+      smsRecord.status = 'sent';
+      smsRecord.twilioSid = result.sid;
+      smsRecord.sentAt = result.sentAt;
+      
+      await smsRecord.save();
+
+      res.json({
+        success: true,
+        message: 'SMS sent successfully to customer',
+        sms: smsRecord,
+        csrfToken: req.csrfToken()
+      });
+    } catch (twilioError) {
+      smsRecord.status = 'failed';
+      smsRecord.errorMessage = twilioError.message;
+      await smsRecord.save();
+
+      res.status(500).json({
+        success: false,
+        error: `Failed to send SMS: ${twilioError.message}`,
+>>>>>>> origin/main
         csrfToken: req.csrfToken()
       });
     }
   } catch (error) {
+<<<<<<< HEAD
     console.error('Send confirmation SMS error:', error);
     res.status(500).json({
       error: 'Failed to send confirmation SMS',
+=======
+    console.error('Send booking SMS error:', error);
+    res.status(500).json({
+      error: 'Failed to send SMS to customer',
+>>>>>>> origin/main
       csrfToken: req.csrfToken()
     });
   }
 });
 
+<<<<<<< HEAD
 // Get SMS service status
 app.get('/api/admin/sms/status', async (req, res) => {
   try {
@@ -1509,6 +1847,36 @@ app.get('/api/admin/sms/status', async (req, res) => {
     console.error('SMS status check error:', error);
     res.status(500).json({ error: 'Failed to check SMS status' });
   }
+=======
+// Get SMS templates
+app.get('/api/admin/sms/templates', (req, res) => {
+  res.json({
+    templates: [
+      { id: 'reminder', name: 'Appointment Reminder', description: 'Send a reminder about upcoming appointment' },
+      { id: 'confirmation', name: 'Booking Confirmation', description: 'Confirm a booking' },
+      { id: 'running_late', name: 'Running Late', description: 'Notify customer you\'re running late' },
+      { id: 'rescheduled', name: 'Rescheduled', description: 'Notify about rescheduled appointment' },
+      { id: 'cancelled', name: 'Cancelled', description: 'Notify about cancelled appointment' },
+      { id: 'custom', name: 'Custom Message', description: 'Send a custom message' }
+    ]
+  });
+});
+
+// Admin authentication middleware
+function requireAdminAuth(req, res, next) {
+  if (req.session && req.session.user && req.session.user.isAdmin) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
+// Check Twilio configuration status
+app.get('/api/admin/sms/config-status', requireAdminAuth, (req, res) => {
+  res.json({
+    configured: twilioConfigured,
+    phoneNumber: twilioConfigured ? process.env.TWILIO_PHONE_NUMBER : null
+  });
+>>>>>>> origin/main
 });
 
 // ===== Email Configuration =====
@@ -1522,19 +1890,39 @@ const emailTransporter = nodemailer.createTransport({
   }
 });
 
+const sanitizeEmailValue = (value) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const ALLOWED_EMAIL_CURRENCIES = new Set(['$', '€', '£', '¥', '₹', 'USD', 'EUR', 'GBP', 'AUD', 'CAD']);
+
+const sanitizeCurrencyValue = (value) => {
+  const raw = String(value ?? '$').trim();
+  const currency = raw.length === 3 ? raw.toUpperCase() : raw;
+  return ALLOWED_EMAIL_CURRENCIES.has(currency) ? currency : '$';
+};
+
 // Email templates
 const getContactEmailTemplate = (name, formData) => {
+  const safeName = sanitizeEmailValue(name);
+  const safeSubject = sanitizeEmailValue(formData.subject);
+  const safeMessage = sanitizeEmailValue(formData.message);
+
   return {
     subject: 'Thank you for contacting Ami Photography!',
     html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Hi ${name},</h2>
+          <h2 style="color: #333;">Hi ${safeName},</h2>
           <p>Thank you for reaching out to Ami Photography! We've received your inquiry and are excited to potentially work with you.</p>
           
           <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
             <h3>Your Message Details:</h3>
-            <p><strong>Subject:</strong> ${formData.subject}</p>
-            <p><strong>Message:</strong> ${formData.message}</p>
+            <p><strong>Subject:</strong> ${safeSubject}</p>
+            <p><strong>Message:</strong> ${safeMessage}</p>
             <p><strong>Submitted:</strong> ${new Date().toLocaleDateString()}</p>
           </div>
           
@@ -1551,32 +1939,26 @@ const getContactEmailTemplate = (name, formData) => {
 };
 
 const getBookingEmailTemplate = (name, formData) => {
+  const safeName = sanitizeEmailValue(name);
+  const safeEventType = sanitizeEmailValue(formData.eventType);
+  const safeStartTime = sanitizeEmailValue(formData.startTime);
+  const safeEndTime = sanitizeEmailValue(formData.endTime);
+  const safeLocation = sanitizeEmailValue(formData.location);
+  const safePackage = sanitizeEmailValue(formData.package);
+  const safeDetails = sanitizeEmailValue(formData.details || 'None');
+
   return {
     subject: 'Booking Request Confirmation - Ami Photography',
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Hi ${name},</h2>
-          <p>Thank you for your booking request! We're thrilled that you've chosen Ami Photography for your special event.</p>
-          
-          <div style="background-color: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
-            <h3>Your Booking Details:</h3>
-            <p><strong>Event Type:</strong> ${formData.eventType}</p>
-            <p><strong>Date:</strong> ${new Date(formData.date).toLocaleDateString()}</p>
-            <p><strong>Time:</strong> ${formData.startTime} - ${formData.endTime}</p>
-            <p><strong>Location:</strong> ${formData.location}</p>
-            <p><strong>Package:</strong> ${formData.package}</p>
-            <p><strong>Additional Notes:</strong> ${formData.details || 'None'}</p>
-          </div>
-          
-          <p>We'll review your request and get back to you within 24-48 hours to confirm availability and discuss any details.</p>
-          <p>If you have any urgent questions, please don't hesitate to contact us directly.</p>
-          
-          <p>Looking forward to capturing your special moments!<br>
-          <strong>The Ami Photography Team</strong><br>
-          📞 (123) 456-7890<br>
-          ✉️ info@amiphotography.com</p>
-        </div>
-      `
+    html: renderTemplate('booking', {
+      name: safeName,
+      eventType: safeEventType,
+      date: new Date(formData.date).toLocaleDateString(),
+      startTime: safeStartTime,
+      endTime: safeEndTime,
+      location: safeLocation,
+      package: safePackage,
+      details: safeDetails
+    })
   };
 };
 
@@ -1584,6 +1966,19 @@ const getTaxReceiptEmailTemplate = (booking) => {
   const amount = (booking.packageAmount / 100 || booking.estimatedCost || 0).toFixed(2);
   const receiptDate = new Date(booking.stripePaidAt || new Date()).toLocaleDateString();
   const receiptId = `AMI-${booking._id.toString().slice(-8).toUpperCase()}-${new Date().getFullYear()}`;
+  const safeClientName = sanitizeEmailValue(booking.clientName);
+  const safeClientEmail = sanitizeEmailValue(booking.clientEmail);
+  const safeClientPhone = sanitizeEmailValue(booking.clientPhone);
+  const safePackage = sanitizeEmailValue(booking.package);
+  const safeStartTime = sanitizeEmailValue(booking.startTime);
+  const safeEndTime = sanitizeEmailValue(booking.endTime);
+  const safeLocation = sanitizeEmailValue(booking.location);
+  const safePackageCurrency = sanitizeCurrencyValue(booking.packageCurrency || '$');
+  const stripeSessionId = String(booking.stripeSessionId || '');
+  const safeStripeSessionId = sanitizeEmailValue(stripeSessionId.substring(0, 20));
+  const safeStripeSessionDisplay = safeStripeSessionId
+    ? `${safeStripeSessionId}${stripeSessionId.length > 20 ? '...' : ''}`
+    : 'N/A';
 
   return {
     subject: 'Tax Receipt for Photography Services - Ami Photography',
@@ -1599,15 +1994,15 @@ const getTaxReceiptEmailTemplate = (booking) => {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
               <div>
                 <h3 style="color: #333; margin-top: 0; font-size: 14px; text-transform: uppercase; color: #666;">Bill To</h3>
-                <p style="margin: 5px 0; font-size: 16px; font-weight: bold;">${booking.clientName}</p>
-                <p style="margin: 5px 0; color: #666;">${booking.clientEmail}</p>
-                <p style="margin: 5px 0; color: #666;">${booking.clientPhone}</p>
+                <p style="margin: 5px 0; font-size: 16px; font-weight: bold;">${safeClientName}</p>
+                <p style="margin: 5px 0; color: #666;">${safeClientEmail}</p>
+                <p style="margin: 5px 0; color: #666;">${safeClientPhone}</p>
               </div>
               
               <div style="text-align: right;">
                 <p style="margin: 5px 0; color: #666;"><strong>Receipt #:</strong> ${receiptId}</p>
                 <p style="margin: 5px 0; color: #666;"><strong>Date:</strong> ${receiptDate}</p>
-                <p style="margin: 5px 0; color: #666;"><strong>Session ID:</strong> ${booking.stripeSessionId.substring(0, 20)}...</p>
+                <p style="margin: 5px 0; color: #666;"><strong>Session ID:</strong> ${safeStripeSessionDisplay}</p>
               </div>
             </div>
             
@@ -1622,20 +2017,20 @@ const getTaxReceiptEmailTemplate = (booking) => {
                 <tbody>
                   <tr style="border-bottom: 1px solid #e0e0e0;">
                     <td style="padding: 15px 0; color: #555;">
-                      <strong>${booking.package}</strong><br>
+                      <strong>${safePackage}</strong><br>
                       <span style="color: #999; font-size: 12px;">
-                        Event: ${new Date(booking.eventDate).toLocaleDateString()} at ${booking.startTime}<br>
-                        Location: ${booking.location}
+                        Event: ${new Date(booking.eventDate).toLocaleDateString()} at ${safeStartTime}<br>
+                        Location: ${safeLocation}
                       </span>
                     </td>
                     <td style="text-align: right; padding: 15px 0; color: #333; font-weight: 600; font-size: 16px;">
-                      ${booking.packageCurrency || '$'}${amount}
+                      ${safePackageCurrency}${amount}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding: 20px 0; text-align: right; font-weight: 600; color: #667eea; font-size: 18px;">Total Amount Paid:</td>
                     <td style="padding: 20px 0; text-align: right; background-color: #f0f4ff; border-radius: 4px; padding-right: 10px; font-weight: 700; color: #667eea; font-size: 18px;">
-                      ${booking.packageCurrency || '$'}${amount}
+                      ${safePackageCurrency}${amount}
                     </td>
                   </tr>
                 </tbody>
@@ -1651,8 +2046,8 @@ const getTaxReceiptEmailTemplate = (booking) => {
             <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; font-size: 12px; color: #666; line-height: 1.6;">
               <p style="margin: 0 0 10px 0;"><strong>Session Details:</strong></p>
               <ul style="margin: 0; padding-left: 20px;">
-                <li>Date & Time: ${new Date(booking.eventDate).toLocaleDateString()} from ${booking.startTime} to ${booking.endTime}</li>
-                <li>Location: ${booking.location}</li>
+                <li>Date & Time: ${new Date(booking.eventDate).toLocaleDateString()} from ${safeStartTime} to ${safeEndTime}</li>
+                <li>Location: ${safeLocation}</li>
                 <li>Package Includes: All high-resolution edited photos</li>
                 <li>Photos Delivery: 7-10 business days via secure online gallery</li>
               </ul>
@@ -1672,6 +2067,9 @@ const getTaxReceiptEmailTemplate = (booking) => {
 const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
   const amount = (booking.packageAmount / 100 || 0).toFixed(2);
   const refund = (refundAmount / 100).toFixed(2);
+  const safeClientName = sanitizeEmailValue(booking.clientName);
+  const safePackageCurrency = sanitizeCurrencyValue(booking.packageCurrency || '$');
+  const safeRefundReason = sanitizeEmailValue(refundReason);
 
   return {
     subject: 'Booking Cancellation Confirmation - Ami Photography',
@@ -1684,7 +2082,7 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
           
           <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
             
-            <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
+            <p style="color: #333; font-size: 16px;">Hi ${safeClientName},</p>
             
             <p style="color: #555; line-height: 1.6;">
               Your photography booking has been successfully cancelled. We're sorry to see you go, but we understand things come up. 
@@ -1695,16 +2093,16 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
               <table style="width: 100%; border-collapse: collapse;">
                 <tr style="border-bottom: 1px solid #e0e0e0;">
                   <td style="padding: 12px 0; color: #666;"><strong>Original Amount Paid:</strong></td>
-                  <td style="text-align: right; padding: 12px 0; color: #333; font-weight: 600;">${booking.packageCurrency || '$'}${amount}</td>
+                  <td style="text-align: right; padding: 12px 0; color: #333; font-weight: 600;">${safePackageCurrency}${amount}</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #e0e0e0;">
                   <td style="padding: 12px 0; color: #666;"><strong>Cancellation Reason:</strong></td>
-                  <td style="text-align: right; padding: 12px 0; color: #333;">${refundReason}</td>
+                  <td style="text-align: right; padding: 12px 0; color: #333;">${safeRefundReason}</td>
                 </tr>
                 <tr>
                   <td style="padding: 15px 0; color: #667eea; font-size: 16px;"><strong>Refund Amount:</strong></td>
                   <td style="text-align: right; padding: 15px 0; background-color: #e8f5e9; border-radius: 4px; padding-right: 10px; font-weight: 700; color: #2e7d32; font-size: 18px;">
-                    ${booking.packageCurrency || '$'}${refund}
+                    ${safePackageCurrency}${refund}
                   </td>
                 </tr>
               </table>
@@ -1712,7 +2110,7 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
             
             <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 20px 0;">
               <p style="margin: 0; color: #1565c0; font-size: 14px;">
-                <strong>✓ Refund Processing:</strong> Your refund of ${booking.packageCurrency || '$'}${refund} will be processed to your original payment method within 5-7 business days.
+                <strong>✓ Refund Processing:</strong> Your refund of ${safePackageCurrency}${refund} will be processed to your original payment method within 5-7 business days.
               </p>
             </div>
             
@@ -1736,6 +2134,12 @@ const getCancellationEmailTemplate = (booking, refundAmount, refundReason) => {
 
 const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
   const eventDate = new Date(booking.eventDate);
+  const safeClientName = sanitizeEmailValue(booking.clientName);
+  const safeStartTime = sanitizeEmailValue(booking.startTime);
+  const safeLocation = sanitizeEmailValue(booking.location);
+  const safePackage = sanitizeEmailValue(booking.package);
+  const safeNewTime = sanitizeEmailValue(newTime);
+  const safeReason = sanitizeEmailValue(reason);
 
   return {
     subject: 'Reschedule Request Received - Ami Photography',
@@ -1748,7 +2152,7 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
           
           <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
             
-            <p style="color: #333; font-size: 16px;">Hi ${booking.clientName},</p>
+            <p style="color: #333; font-size: 16px;">Hi ${safeClientName},</p>
             
             <p style="color: #555; line-height: 1.6;">
               Thank you for submitting your reschedule request. We've received your request and will confirm your new date within 24 hours.
@@ -1758,9 +2162,9 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
               <h3 style="color: #667eea; margin-top: 0;">Current Booking Details</h3>
               <p style="margin: 10px 0; color: #555;">
                 <strong>Current Date:</strong> ${eventDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
-                <strong>Current Time:</strong> ${booking.startTime}<br>
-                <strong>Location:</strong> ${booking.location}<br>
-                <strong>Package:</strong> ${booking.package}
+                <strong>Current Time:</strong> ${safeStartTime}<br>
+                <strong>Location:</strong> ${safeLocation}<br>
+                <strong>Package:</strong> ${safePackage}
               </p>
               
               <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
@@ -1768,10 +2172,10 @@ const getRescheduleEmailTemplate = (booking, newDate, newTime, reason) => {
               <h3 style="color: #667eea; margin-top: 0;">Your Requested New Date</h3>
               <p style="margin: 10px 0; color: #555;">
                 <strong>Requested Date:</strong> ${new Date(newDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}<br>
-                <strong>Requested Time:</strong> ${newTime}
+                <strong>Requested Time:</strong> ${safeNewTime}
               </p>
               
-              ${reason ? `<p style="margin: 15px 0; color: #666;"><strong>Reason:</strong> ${reason}</p>` : ''}
+              ${reason ? `<p style="margin: 15px 0; color: #666;"><strong>Reason:</strong> ${safeReason}</p>` : ''}
             </div>
             
             <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; border-radius: 4px; margin: 20px 0;">
@@ -1812,7 +2216,7 @@ async function sendConfirmationEmail(email, template) {
 }
 
 // Logout
-app.post('/api/admin/logout', (req, res) => {
+app.post('/api/admin/logout', csrfProtection, (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       console.error('Logout error:', err);
@@ -1942,6 +2346,371 @@ app.post('/submit-booking', csrfProtection, async (req, res) => {
   }
 });
 
+// ===== File Upload System =====
+const multer = require('multer');
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../uploads');
+    const fs = require('fs');
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname);
+    cb(null, `${uniqueSuffix}${ext}`);
+  }
+});
+const upload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (req, file, cb) => {
+    const allowedExt = /^\.(jpeg|jpg|png|gif|pdf|webp)$/;
+    const allowedMime = /^(image\/(jpeg|png|gif|webp)|application\/pdf)$/;
+    const extOk = allowedExt.test(path.extname(file.originalname).toLowerCase());
+    const mimeOk = allowedMime.test(file.mimetype);
+    cb(extOk && mimeOk ? null : new Error('Only images and PDFs are allowed'), extOk && mimeOk);
+  }
+});
+
+app.post('/api/upload', authenticate, csrfProtection, upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  res.json({
+    success: true,
+    file: {
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      url: `/uploads/${req.file.filename}`
+    }
+  });
+});
+
+app.get('/api/admin/uploads', authenticate, (req, res) => {
+  const fs = require('fs');
+  const uploadDir = path.join(__dirname, '../uploads');
+  try {
+    if (!fs.existsSync(uploadDir)) {
+      return res.json({ files: [] });
+    }
+    const files = fs.readdirSync(uploadDir).map((name) => ({
+      filename: name,
+      url: `/uploads/${name}`
+    }));
+    res.json({ files });
+  } catch (error) {
+    console.error('List uploads error:', error);
+    res.status(500).json({ error: 'Failed to list uploads' });
+  }
+});
+
+// Serve uploaded files (admin only)
+app.use('/uploads', authenticate, express.static(path.join(__dirname, '../uploads')));
+
+// ===== Client Portal — JWT Authentication =====
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.SESSION_SECRET || (() => {
+  console.warn('⚠️ SESSION_SECRET not set — client portal JWT auth is disabled.');
+  return '';
+})();
+
+app.post('/api/client/login', csrfProtection, async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+  if (!JWT_SECRET) {
+    return res.status(503).json({ error: 'Client authentication is not configured' });
+  }
+
+  const booking = await Booking.findOne({ clientEmail: email.toLowerCase().trim() });
+  if (!booking) {
+    return res.status(404).json({ error: 'No bookings found for that email' });
+  }
+
+  const token = jwt.sign({ email: email.toLowerCase().trim() }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ success: true, token });
+});
+
+const authenticateClient = (req, res, next) => {
+  if (!JWT_SECRET) {
+    return res.status(503).json({ error: 'Client authentication is not configured' });
+  }
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  try {
+    const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+    req.clientEmail = decoded.email;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
+
+app.get('/api/client/bookings', authenticateClient, async (req, res) => {
+  try {
+    const bookings = await Booking.find({ clientEmail: req.clientEmail })
+      .sort({ eventDate: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      bookings: bookings.map((b) => ({
+        _id: b._id,
+        eventDate: b.eventDate,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        location: b.location,
+        package: b.package,
+        status: b.status,
+        depositPaid: b.depositPaid,
+        packageAmount: b.packageAmount,
+        packageCurrency: b.packageCurrency,
+        stripePaidAt: b.stripePaidAt
+      }))
+    });
+  } catch (error) {
+    console.error('Client bookings error:', error);
+    res.status(500).json({ error: 'Failed to fetch bookings' });
+  }
+});
+
+// ===== Payment Refunds =====
+/**
+ * @openapi
+ * /api/admin/refund:
+ *   post:
+ *     summary: Process a refund for a booking
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [bookingId]
+ *             properties:
+ *               bookingId: { type: string }
+ *               amount: { type: number, description: Amount in cents }
+ *     responses:
+ *       200:
+ *         description: Refund processed
+ *       404:
+ *         description: Booking not found
+ */
+app.post('/api/admin/refund', authenticate, csrfProtection, async (req, res) => {
+  const { bookingId, amount } = req.body;
+
+  if (!bookingId || typeof bookingId !== 'string') {
+    return res.status(400).json({ error: 'Booking ID is required' });
+  }
+  if (!stripe) {
+    return res.status(503).json({ error: 'Stripe is not configured' });
+  }
+
+  try {
+    const booking = await Booking.findById(String(bookingId));
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    if (!booking.stripePaymentIntentId) {
+      return res.status(400).json({ error: 'No payment intent found for this booking' });
+    }
+
+    const refundParams = { payment_intent: booking.stripePaymentIntentId };
+    if (amount) {
+      refundParams.amount = Math.round(amount); // amount in cents
+    }
+
+    const refund = await stripe.refunds.create(refundParams);
+
+    booking.status = 'cancelled';
+    booking.additionalNotes = `Refund processed: ${refund.id}. Amount: ${refund.amount / 100} ${refund.currency}`;
+    await booking.save();
+
+    res.json({
+      success: true,
+      refund: {
+        id: refund.id,
+        amount: refund.amount,
+        currency: refund.currency,
+        status: refund.status
+      }
+    });
+  } catch (error) {
+    console.error('Refund error:', error);
+    res.status(500).json({ error: 'Refund failed: ' + error.message });
+  }
+});
+
+// ===== PDF Receipt Download =====
+/**
+ * @openapi
+ * /api/booking/{id}/receipt.pdf:
+ *   get:
+ *     summary: Download booking receipt as PDF
+ *     tags: [Booking]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: PDF file
+ *         content:
+ *           application/pdf: {}
+ */
+app.get('/api/booking/:id/receipt.pdf', async (req, res) => {
+  // Require either admin session or client JWT
+  const isAdmin = !!req.session?.admin;
+  let clientEmail = null;
+  if (!isAdmin) {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ') && JWT_SECRET) {
+      try {
+        const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        clientEmail = decoded.email;
+      } catch { /* invalid token */ }
+    }
+  }
+  if (!isAdmin && !clientEmail) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid booking ID' });
+  }
+
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Clients can only access their own receipts
+    if (!isAdmin && clientEmail && booking.clientEmail !== clientEmail) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="receipt-${booking._id}.pdf"`);
+    doc.pipe(res);
+
+    const amount = (booking.packageAmount / 100 || booking.estimatedCost || 0).toFixed(2);
+    const receiptId = `AMI-${booking._id.toString().slice(-8).toUpperCase()}-${new Date().getFullYear()}`;
+    const currency = booking.packageCurrency || '$';
+
+    // Header
+    doc.fontSize(24).text('Ami Photography', { align: 'center' });
+    doc.fontSize(12).text('TAX RECEIPT / INVOICE', { align: 'center' });
+    doc.moveDown(2);
+
+    // Receipt details
+    doc.fontSize(10);
+    doc.text(`Receipt #: ${receiptId}`);
+    doc.text(`Date: ${new Date(booking.stripePaidAt || booking.createdAt).toLocaleDateString()}`);
+    doc.moveDown();
+
+    // Bill To
+    doc.fontSize(12).text('Bill To:', { underline: true });
+    doc.fontSize(10);
+    doc.text(booking.clientName);
+    doc.text(booking.clientEmail);
+    doc.text(booking.clientPhone);
+    doc.moveDown();
+
+    // Service details
+    doc.fontSize(12).text('Service Details:', { underline: true });
+    doc.fontSize(10);
+    doc.text(`Package: ${booking.package}`);
+    doc.text(`Event Date: ${new Date(booking.eventDate).toLocaleDateString()}`);
+    doc.text(`Time: ${booking.startTime} - ${booking.endTime}`);
+    doc.text(`Location: ${booking.location}`);
+    doc.moveDown();
+
+    // Amount
+    doc.fontSize(14).text(`Total Amount Paid: ${currency}${amount}`, { align: 'right' });
+    doc.moveDown(2);
+
+    // Footer
+    doc.fontSize(8).text('Thank you for your business! Photos will be delivered within 7-10 business days.', { align: 'center' });
+    doc.text('Ami Photography • (123) 456-7890 • info@amiphotography.com', { align: 'center' });
+
+    doc.end();
+  } catch (error) {
+    console.error('PDF receipt error:', error);
+    res.status(500).json({ error: 'Failed to generate receipt' });
+  }
+});
+
+// ===== Analytics Dashboard API =====
+app.get('/api/admin/analytics', authenticate, async (req, res) => {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    const [totalBookings, monthBookings, confirmedBookings, cancelledBookings, revenueAgg, monthlyRevenueAgg, packageBreakdown] = await Promise.all([
+      Booking.countDocuments(),
+      Booking.countDocuments({ createdAt: { $gte: startOfMonth } }),
+      Booking.countDocuments({ status: 'confirmed' }),
+      Booking.countDocuments({ status: 'cancelled' }),
+      Booking.aggregate([
+        { $match: { depositPaid: true } },
+        { $group: { _id: null, total: { $sum: '$packageAmount' } } }
+      ]),
+      Booking.aggregate([
+        { $match: { createdAt: { $gte: startOfYear }, depositPaid: true } },
+        {
+          $group: {
+            _id: { $month: '$createdAt' },
+            revenue: { $sum: '$packageAmount' },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ]),
+      Booking.aggregate([
+        { $group: { _id: '$package', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ])
+    ]);
+
+    const totalRevenue = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
+
+    res.json({
+      totalBookings,
+      monthBookings,
+      confirmedBookings,
+      cancelledBookings,
+      totalRevenue,
+      totalRevenueFormatted: `$${(totalRevenue / 100).toFixed(2)}`,
+      monthlyRevenue: monthlyRevenueAgg.map((m) => ({
+        month: m._id,
+        revenue: m.revenue,
+        revenueFormatted: `$${(m.revenue / 100).toFixed(2)}`,
+        bookings: m.count
+      })),
+      packageBreakdown: packageBreakdown.map((p) => ({
+        package: p._id,
+        count: p.count
+      }))
+    });
+  } catch (error) {
+    console.error('Analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
 // ===== Serve Frontend Static Files in Production =====
 if (process.env.NODE_ENV === 'production') {
   const buildPath = path.join(__dirname, '../dist');
@@ -1958,6 +2727,11 @@ app.use('/api', (req, res) => {
 
 // ===== Error Handling =====
 app.use((err, req, res, next) => {
+  // Report to Sentry when available
+  if (Sentry) {
+    Sentry.captureException(err);
+  }
+
   console.error('Error:', {
     message: err.message,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
@@ -1987,4 +2761,19 @@ app.listen(PORT, () => {
   console.log(`🔗 Access URL: ${process.env.CLIENT_URL || 'http://localhost:' + PORT}`);
   console.log(`🔐 Admin panel: ${process.env.CLIENT_URL || 'http://localhost:' + PORT}/admin.html`);
   console.log(`📡 API Base URL: ${process.env.CLIENT_URL || 'http://localhost:' + PORT}/api/admin\n`);
+});
+
+// ===== Global Unhandled Error Handlers =====
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+  if (Sentry) Sentry.captureException(reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  if (Sentry) {
+    Sentry.captureException(err);
+    Sentry.flush(2000).finally(() => process.exit(1));
+  } else {
+    process.exit(1);
+  }
 });

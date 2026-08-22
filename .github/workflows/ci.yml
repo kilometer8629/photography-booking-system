@@ -1,0 +1,74 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate repository
+        run: |
+          echo "=== Repository Validation ==="
+          echo "Git history (last 5 commits):"
+          git log --oneline -5
+          echo ""
+          echo "Directory structure:"
+          ls -la
+          echo ""
+          echo "Project configuration:"
+          if [ -f package.json ]; then
+            echo "package.json found"
+            node -e "const p=require('./package.json'); console.log('Name:', p.name); console.log('Version:', p.version); console.log('Scripts:', Object.keys(p.scripts||{}).join(', '))"
+          fi
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint code
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build project
+        run: npm run build
+
+      - name: Pipeline summary
+        if: always()
+        run: |
+          echo "=== Pipeline Summary ==="
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Environment: ${{ inputs.environment }}"
+          fi
+          echo "Pipeline completed."

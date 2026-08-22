@@ -209,6 +209,7 @@
                 <ul>
                     <li><a href="#" class="nav-link" data-section="bookings"><i class="fas fa-calendar-check"></i> Bookings</a></li>
                     <li><a href="#" class="nav-link" data-section="messages"><i class="fas fa-envelope"></i> Messages <span id="unread-count" class="badge hidden">0</span></a></li>
+                    <li><a href="#" class="nav-link" data-section="sms"><i class="fas fa-sms"></i> SMS Messages</a></li>
                     <li><a href="#" id="logout" class="nav-link"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                 </ul>
             </nav>
@@ -371,8 +372,167 @@
                     <div class="pagination" id="messages-pagination"></div>
                 </div>
             </section>
+
+            <!-- SMS Messages Section -->
+            <section id="sms-section" class="admin-section hidden">
+                <div class="section-header">
+                    <h2><i class="fas fa-sms"></i> SMS Message Management</h2>
+                    <div class="section-controls">
+                        <div class="filter-group">
+                            <label for="sms-filter"><i class="fas fa-filter"></i></label>
+                            <select id="sms-filter" class="form-select">
+                                <option value="all">All Messages</option>
+                                <option value="sent">Sent</option>
+                                <option value="failed">Failed</option>
+                                <option value="pending">Pending</option>
+                            </select>
+                        </div>
+                        <button id="send-new-sms" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Send SMS
+                        </button>
+                        <button id="refresh-sms" class="btn btn-secondary">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <div id="sms-config-warning" class="alert alert-warning hidden">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>SMS service not configured.</strong> Please configure Twilio settings in your environment variables.
+                </div>
+
+                <div class="table-responsive">
+                    <table class="admin-table" id="sms-table">
+                        <thead>
+                            <tr>
+                                <th>Recipient</th>
+                                <th>Phone</th>
+                                <th>Message</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Sent</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sms-list">
+                            <tr class="loading-row">
+                                <td colspan="7">
+                                    <div class="loading-content">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading SMS messages...
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="sms-empty" class="empty-state hidden">
+                    <i class="fas fa-comment-slash"></i>
+                    <h3>No SMS messages found</h3>
+                    <p>When you send SMS messages, they'll appear here.</p>
+                </div>
+                <div id="sms-error" class="error-state hidden">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error loading SMS messages</h3>
+                    <p>We couldn't load your SMS messages. Please try again.</p>
+                    <button class="btn btn-retry" id="retry-sms">Retry</button>
+                </div>
+                <div class="table-footer">
+                    <div class="pagination" id="sms-pagination"></div>
+                </div>
+            </section>
         </div>
     </main>
+
+        <!-- Send SMS Modal -->
+        <div id="sms-modal" class="modal-overlay hidden">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>Send SMS Message</h3>
+                    <button type="button" class="close-modal" id="close-sms-modal" aria-label="Close modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="sms-form">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="sms-booking-select">
+                                <i class="fas fa-calendar"></i> Booking (Optional)
+                            </label>
+                            <select id="sms-booking-select" class="form-select">
+                                <option value="">Select a booking (or send custom SMS)</option>
+                            </select>
+                            <small class="form-hint">Select a booking to auto-fill customer details</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sms-recipient-name">
+                                <i class="fas fa-user"></i> Recipient Name
+                            </label>
+                            <input type="text" id="sms-recipient-name" class="form-input" placeholder="Customer name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sms-phone">
+                                <i class="fas fa-phone"></i> Phone Number
+                            </label>
+                            <input type="tel" id="sms-phone" class="form-input" placeholder="+61412345678 or 0412345678" required>
+                            <small class="form-hint">Include country code (+61 for Australia) or start with 0</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sms-template">
+                                <i class="fas fa-file-alt"></i> Message Template
+                            </label>
+                            <select id="sms-template" class="form-select">
+                                <option value="custom">Custom Message</option>
+                                <option value="reminder">Appointment Reminder</option>
+                                <option value="confirmation">Booking Confirmation</option>
+                                <option value="running_late">Running Late</option>
+                                <option value="rescheduled">Rescheduled</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+
+                        <div id="template-fields" class="hidden">
+                            <div class="form-group" id="delay-field" style="display:none;">
+                                <label for="sms-delay">Delay (minutes)</label>
+                                <input type="number" id="sms-delay" class="form-input" placeholder="15" min="1" max="120">
+                            </div>
+                            <div class="form-group" id="new-date-field" style="display:none;">
+                                <label for="sms-new-date">New Date</label>
+                                <input type="date" id="sms-new-date" class="form-input">
+                            </div>
+                            <div class="form-group" id="new-time-field" style="display:none;">
+                                <label for="sms-new-time">New Time</label>
+                                <input type="time" id="sms-new-time" class="form-input">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sms-message">
+                                <i class="fas fa-comment"></i> Message
+                                <span id="char-count" class="char-counter">0/1600</span>
+                            </label>
+                            <textarea id="sms-message" class="form-textarea" rows="5" maxlength="1600" placeholder="Enter your message here..." required></textarea>
+                            <small class="form-hint">Maximum 1600 characters. Standard SMS rates apply.</small>
+                        </div>
+
+                        <div id="sms-preview" class="alert alert-info hidden">
+                            <strong>Preview:</strong>
+                            <div id="sms-preview-text"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="cancel-sms-btn" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                        <button type="submit" id="send-sms-btn" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Send SMS
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <!-- Booking/Message Modal -->
         <div id="booking-modal" class="modal-overlay hidden">
@@ -389,6 +549,9 @@
                 <div class="modal-footer">
                     <button type="button" id="close-modal-btn" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Close
+                    </button>
+                    <button type="button" id="send-sms-to-customer-btn" class="btn btn-info hidden">
+                        <i class="fas fa-sms"></i> Send SMS
                     </button>
                     <button type="button" id="confirm-booking-btn" class="btn btn-primary hidden">
                         <i class="fas fa-check"></i> Confirm Booking
