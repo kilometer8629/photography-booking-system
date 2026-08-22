@@ -1,0 +1,50 @@
+<div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0;">
+    <h1 style="margin: 0 0 10px 0; font-size: 28px;">Reschedule Request Received</h1>
+    <p style="margin: 0; opacity: 0.9;">We're working on your new date</p>
+  </div>
+  
+  <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none;">
+    
+    <p style="color: #333; font-size: 16px;">Hi {{clientName}},</p>
+    
+    <p style="color: #555; line-height: 1.6;">
+      Thank you for submitting your reschedule request. We've received your request and will confirm your new date within 24 hours.
+    </p>
+    
+    <div style="background: white; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #e0e0e0;">
+      <h3 style="color: #667eea; margin-top: 0;">Current Booking Details</h3>
+      <p style="margin: 10px 0; color: #555;">
+        <strong>Current Date:</strong> {{currentDate}}<br>
+        <strong>Current Time:</strong> {{startTime}}<br>
+        <strong>Location:</strong> {{location}}<br>
+        <strong>Package:</strong> {{package}}
+      </p>
+      
+      <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+      
+      <h3 style="color: #667eea; margin-top: 0;">Your Requested New Date</h3>
+      <p style="margin: 10px 0; color: #555;">
+        <strong>Requested Date:</strong> {{newDate}}<br>
+        <strong>Requested Time:</strong> {{newTime}}
+      </p>
+      
+      {{#if reason}}
+      <p style="margin: 15px 0; color: #666;"><strong>Reason:</strong> {{reason}}</p>
+      {{/if}}
+    </div>
+    
+    <div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; border-radius: 4px; margin: 20px 0;">
+      <p style="margin: 0; color: #2e7d32; font-size: 14px;">
+        <strong>✓ What's Next?</strong> We'll confirm availability for your new date and send you a confirmation email within 24 hours. Your package and price remain the same.
+      </p>
+    </div>
+    
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999; text-align: center;">
+      <p style="margin: 5px 0;">If you need to change your request or have questions, please contact us:<br>
+      📞 (123) 456-7890 • ✉️ info@amiphotography.com<br>
+      <br>
+      Thank you for your patience!</p>
+    </div>
+  </div>
+</div>

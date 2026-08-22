@@ -1,139 +1,312 @@
-require('../../config/loadEnv');
+/**
+ * Twilio SMS Service
+ * Handles sending SMS notifications to customers for bookings and appointments
+ */
+
 const twilio = require('twilio');
 
 // Initialize Twilio client
 let twilioClient = null;
-let twilioConfigured = false;
 
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
-
-if (accountSid && authToken && twilioPhoneNumber) {
+/**
+ * Initialize the Twilio client with credentials from environment variables
+ */
+function initializeTwilioClient() {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  
+  if (!accountSid || !authToken) {
+    console.warn('⚠️ Twilio credentials not configured. SMS notifications are disabled.');
+    return null;
+  }
+  
   try {
     twilioClient = twilio(accountSid, authToken);
-    twilioConfigured = true;
-    console.log('✅ Twilio SMS service initialized successfully');
+    console.log('✅ Twilio client initialized successfully');
+    return twilioClient;
   } catch (error) {
-    console.error('❌ Failed to initialize Twilio:', error.message);
+    console.error('❌ Failed to initialize Twilio client:', error.message);
+    return null;
   }
-} else {
-  console.warn('⚠️ Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER in environment variables.');
 }
 
 /**
- * Send an SMS message using Twilio
- * @param {string} to - Recipient phone number (E.164 format recommended)
- * @param {string} message - Message body (max 1600 chars)
- * @returns {Promise<object>} - Twilio message object
+ * Format phone number to E.164 format if needed
+ * @param {string} phoneNumber - Phone number to format
+ * @returns {string} - Formatted phone number
  */
-async function sendSMS(to, message) {
-  if (!twilioConfigured) {
-    throw new Error('Twilio is not configured. Please set environment variables.');
+function formatPhoneNumber(phoneNumber) {
+  // Remove all non-digit characters
+  const cleaned = phoneNumber.replace(/\D/g, '');
+  
+  // If it starts with 0 (Australian local format), replace with +61
+  if (cleaned.startsWith('0')) {
+    return `+61${cleaned.substring(1)}`;
   }
-
-  if (!to || !message) {
-    throw new Error('Phone number and message are required');
+  
+  // If it doesn't start with +, assume Australian number
+  if (!phoneNumber.startsWith('+')) {
+    // If it starts with 61, add +
+    if (cleaned.startsWith('61')) {
+      return `+${cleaned}`;
+    }
+    // Otherwise, add +61
+    return `+61${cleaned}`;
   }
+  
+  return phoneNumber;
+}
 
-  const cleanedPhone = formatPhoneNumber(to);
-  if (cleanedPhone === '+61') {
-    throw new Error('Invalid phone number format. Please provide number in E.164 format (e.g., +61412345678) or with a leading 0 for Australian numbers.');
+/**
+ * Send a booking confirmation SMS
+ * @param {Object} booking - Booking details
+ * @returns {Promise<Object>} - Result of SMS send operation
+ */
+async function sendBookingConfirmationSMS(booking) {
+  if (!twilioClient) {
+    twilioClient = initializeTwilioClient();
   }
-
+  
+  if (!twilioClient) {
+    return { success: false, error: 'Twilio client not configured' };
+  }
+  
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  if (!fromNumber) {
+    return { success: false, error: 'Twilio phone number not configured' };
+  }
+  
   try {
+    const eventDate = new Date(booking.eventDate);
+    const formattedDate = eventDate.toLocaleDateString('en-AU', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    const message = `Hi ${booking.clientName}! Your ${booking.package} photography session is confirmed for ${formattedDate} at ${booking.startTime}. Location: ${booking.location}. Thank you for choosing Ami Photography! 📸`;
+    
+    const toNumber = formatPhoneNumber(booking.clientPhone);
+    
     const result = await twilioClient.messages.create({
       body: message,
-      from: twilioPhoneNumber,
-      to: cleanedPhone
+      from: fromNumber,
+      to: toNumber
     });
-
-    console.log('✅ SMS sent successfully to %s. SID: %s', cleanedPhone, result.sid);
-    return {
-      success: true,
-      sid: result.sid,
-      status: result.status,
-      to: cleanedPhone,
-      sentAt: new Date()
-    };
+    
+    console.log(`✅ Booking confirmation SMS sent to ${toNumber}:`, result.sid);
+    return { success: true, messageSid: result.sid };
   } catch (error) {
-    console.error('❌ Failed to send SMS to %s: %s', cleanedPhone, error.message);
-    throw new Error(`SMS sending failed: ${error.message}`);
+    console.error('❌ Failed to send booking confirmation SMS:', error.message);
+    return { success: false, error: error.message };
   }
 }
 
 /**
- * Get SMS message status from Twilio
- * @param {string} messageSid - Twilio message SID
- * @returns {Promise<object>} - Message status
+ * Send a payment confirmation SMS
+ * @param {Object} booking - Booking details
+ * @returns {Promise<Object>} - Result of SMS send operation
  */
-async function getSMSStatus(messageSid) {
-  if (!twilioConfigured) {
-    throw new Error('Twilio is not configured');
+async function sendPaymentConfirmationSMS(booking) {
+  if (!twilioClient) {
+    twilioClient = initializeTwilioClient();
   }
-
+  
+  if (!twilioClient) {
+    return { success: false, error: 'Twilio client not configured' };
+  }
+  
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  if (!fromNumber) {
+    return { success: false, error: 'Twilio phone number not configured' };
+  }
+  
   try {
-    const message = await twilioClient.messages(messageSid).fetch();
-    return {
-      sid: message.sid,
-      status: message.status,
-      to: message.to,
-      from: message.from,
-      errorCode: message.errorCode,
-      errorMessage: message.errorMessage,
-      dateSent: message.dateSent
-    };
+    const amount = ((booking.packageAmount || 0) / 100 || booking.estimatedCost || 0).toFixed(2);
+    const currency = booking.packageCurrency || '$';
+    
+    const message = `Payment confirmed! ${currency}${amount} received for your ${booking.package} session. You'll receive a tax receipt via email. Thank you! - Ami Photography`;
+    
+    const toNumber = formatPhoneNumber(booking.clientPhone);
+    
+    const result = await twilioClient.messages.create({
+      body: message,
+      from: fromNumber,
+      to: toNumber
+    });
+    
+    console.log(`✅ Payment confirmation SMS sent to ${toNumber}:`, result.sid);
+    return { success: true, messageSid: result.sid };
   } catch (error) {
-    console.error('❌ Failed to fetch SMS status for %s: %s', messageSid, error.message);
-    throw new Error(`Failed to fetch SMS status: ${error.message}`);
+    console.error('❌ Failed to send payment confirmation SMS:', error.message);
+    return { success: false, error: error.message };
   }
 }
 
 /**
- * Create predefined message templates
- * @param {string} type - Template type
- * @param {object} data - Data to populate template
- * @returns {string} - Formatted message
+ * Send a booking cancellation SMS
+ * @param {Object} booking - Booking details
+ * @param {number} refundAmount - Refund amount in cents
+ * @param {string} refundReason - Reason for refund
+ * @returns {Promise<Object>} - Result of SMS send operation
  */
-function createMessageTemplate(type, data = {}) {
-  const templates = {
-    reminder: `Hi ${data.clientName || 'there'}! Reminder: Your ${data.eventType || 'photography session'} is scheduled for ${data.eventDate} at ${data.startTime} at ${data.location}. Looking forward to seeing you! - Ami Photography`,
+async function sendCancellationSMS(booking, refundAmount, refundReason) {
+  if (!twilioClient) {
+    twilioClient = initializeTwilioClient();
+  }
+  
+  if (!twilioClient) {
+    return { success: false, error: 'Twilio client not configured' };
+  }
+  
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  if (!fromNumber) {
+    return { success: false, error: 'Twilio phone number not configured' };
+  }
+  
+  try {
+    const refund = (refundAmount / 100).toFixed(2);
+    const currency = booking.packageCurrency || '$';
     
-    confirmation: `Hi ${data.clientName || 'there'}! Your booking for ${data.eventDate} at ${data.startTime} has been confirmed. We'll see you at ${data.location}. Reply STOP to unsubscribe. - Ami Photography`,
+    // Include refund information or no-refund reason
+    let message;
+    if (refundAmount > 0) {
+      message = `Your booking has been cancelled. Refund of ${currency}${refund} will be processed to your original payment method within 5-7 business days. - Ami Photography`;
+    } else {
+      message = `Your booking has been cancelled. ${refundReason || 'No refund applicable per cancellation policy'}. - Ami Photography`;
+    }
     
-    running_late: `Hi ${data.clientName || 'there'}! We're running about ${data.delayMinutes || '15'} minutes late for your ${data.startTime} session. We apologize for the inconvenience and will be there soon! - Ami Photography`,
+    const toNumber = formatPhoneNumber(booking.clientPhone);
     
-    rescheduled: `Hi ${data.clientName || 'there'}! Your session has been rescheduled to ${data.newDate} at ${data.newTime}. Location remains ${data.location}. Reply to confirm. - Ami Photography`,
+    const result = await twilioClient.messages.create({
+      body: message,
+      from: fromNumber,
+      to: toNumber
+    });
     
-    cancelled: `Hi ${data.clientName || 'there'}! Your booking for ${data.eventDate} at ${data.startTime} has been cancelled as requested. Please contact us if you have any questions. - Ami Photography`
-  };
-
-  return templates[type] || data.customMessage || '';
+    console.log(`✅ Cancellation SMS sent to ${toNumber}:`, result.sid);
+    return { success: true, messageSid: result.sid };
+  } catch (error) {
+    console.error('❌ Failed to send cancellation SMS:', error.message);
+    return { success: false, error: error.message };
+  }
 }
 
-function formatPhoneNumber(phoneNumber = '') {
-  const rawPhone = String(phoneNumber).trim();
-  const digits = rawPhone.replace(/\D/g, '');
-
-  if (rawPhone.startsWith('+')) {
-    return `+${digits}`;
+/**
+ * Send a reschedule confirmation SMS
+ * @param {Object} booking - Booking details
+ * @param {string} newDate - New booking date
+ * @param {string} newTime - New booking time
+ * @returns {Promise<Object>} - Result of SMS send operation
+ */
+async function sendRescheduleSMS(booking, newDate, newTime) {
+  if (!twilioClient) {
+    twilioClient = initializeTwilioClient();
   }
-
-  if (digits.startsWith('0')) {
-    return `+61${digits.substring(1)}`;
+  
+  if (!twilioClient) {
+    return { success: false, error: 'Twilio client not configured' };
   }
-
-  if (digits.startsWith('61')) {
-    return `+${digits}`;
+  
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  if (!fromNumber) {
+    return { success: false, error: 'Twilio phone number not configured' };
   }
+  
+  try {
+    const formattedDate = new Date(newDate).toLocaleDateString('en-AU', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    const message = `Your reschedule request has been received. New requested date: ${formattedDate} at ${newTime}. We'll confirm availability within 24 hours. - Ami Photography`;
+    
+    const toNumber = formatPhoneNumber(booking.clientPhone);
+    
+    const result = await twilioClient.messages.create({
+      body: message,
+      from: fromNumber,
+      to: toNumber
+    });
+    
+    console.log(`✅ Reschedule SMS sent to ${toNumber}:`, result.sid);
+    return { success: true, messageSid: result.sid };
+  } catch (error) {
+    console.error('❌ Failed to send reschedule SMS:', error.message);
+    return { success: false, error: error.message };
+  }
+}
 
-  return `+61${digits}`;
+/**
+ * Send a booking reminder SMS (for future use)
+ * @param {Object} booking - Booking details
+ * @param {number} hoursUntil - Hours until the booking
+ * @returns {Promise<Object>} - Result of SMS send operation
+ */
+async function sendBookingReminderSMS(booking, hoursUntil = 24) {
+  if (!twilioClient) {
+    twilioClient = initializeTwilioClient();
+  }
+  
+  if (!twilioClient) {
+    return { success: false, error: 'Twilio client not configured' };
+  }
+  
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  if (!fromNumber) {
+    return { success: false, error: 'Twilio phone number not configured' };
+  }
+  
+  try {
+    const eventDate = new Date(booking.eventDate);
+    const formattedDate = eventDate.toLocaleDateString('en-AU', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    // Dynamic message based on hours until booking
+    let timePhrase;
+    if (hoursUntil <= 2) {
+      timePhrase = 'in a few hours';
+    } else if (hoursUntil <= 12) {
+      timePhrase = 'later today';
+    } else if (hoursUntil <= 24) {
+      timePhrase = 'tomorrow';
+    } else if (hoursUntil <= 48) {
+      timePhrase = 'in 2 days';
+    } else {
+      const days = Math.round(hoursUntil / 24);
+      timePhrase = `in ${days} days`;
+    }
+    
+    const message = `Reminder: Your ${booking.package} session is ${timePhrase}, ${formattedDate} at ${booking.startTime}. Location: ${booking.location}. See you soon! 📸 - Ami Photography`;
+    
+    const toNumber = formatPhoneNumber(booking.clientPhone);
+    
+    const result = await twilioClient.messages.create({
+      body: message,
+      from: fromNumber,
+      to: toNumber
+    });
+    
+    console.log(`✅ Booking reminder SMS sent to ${toNumber}:`, result.sid);
+    return { success: true, messageSid: result.sid };
+  } catch (error) {
+    console.error('❌ Failed to send booking reminder SMS:', error.message);
+    return { success: false, error: error.message };
+  }
 }
 
 module.exports = {
-  sendSMS,
-  getSMSStatus,
-  createMessageTemplate,
-  formatPhoneNumber,
-  twilioConfigured
+  initializeTwilioClient,
+  sendBookingConfirmationSMS,
+  sendPaymentConfirmationSMS,
+  sendCancellationSMS,
+  sendRescheduleSMS,
+  sendBookingReminderSMS,
+  formatPhoneNumber
 };
