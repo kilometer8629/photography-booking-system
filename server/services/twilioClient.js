@@ -31,7 +31,7 @@ if (twilioEnabled) {
  * Send SMS notification
  * @param {string} to - Recipient phone number (E.164 format recommended)
  * @param {string} message - SMS message text
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, messageSid?: string, messageId?: string, error?: string}>}
  */
 async function sendSMS(to, message) {
   if (!twilioEnabled || !twilioClient) {
@@ -53,7 +53,7 @@ async function sendSMS(to, message) {
     });
 
     console.log(`✅ SMS sent successfully to ${maskPhoneNumber(to)}. Message SID: ${result.sid}`);
-    return { success: true, messageId: result.sid };
+    return { success: true, messageSid: result.sid, messageId: result.sid };
   } catch (error) {
     console.error('❌ SMS sending failed:', error.message);
     return { success: false, error: error.message };
@@ -88,9 +88,15 @@ function maskPhoneNumber(phone) {
 }
 
 /**
+ * Check if Twilio is configured and available
+ * @returns {boolean} - True if Twilio is available
+ */
+const isTwilioConfigured = () => twilioEnabled;
+
+/**
  * Send booking confirmation SMS
  * @param {Object} booking - Booking object with customer details
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, messageSid?: string, error?: string}>}
  */
 async function sendBookingConfirmationSMS(booking) {
   const phoneNumber = formatPhoneNumber(booking.clientPhone);
@@ -110,7 +116,7 @@ async function sendBookingConfirmationSMS(booking) {
  * Send booking status change SMS
  * @param {Object} booking - Booking object
  * @param {string} newStatus - New status of the booking
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, messageSid?: string, error?: string}>}
  */
 async function sendBookingStatusChangeSMS(booking, newStatus) {
   const phoneNumber = formatPhoneNumber(booking.clientPhone);
@@ -144,7 +150,7 @@ async function sendBookingStatusChangeSMS(booking, newStatus) {
  * @param {Object} booking - Booking object
  * @param {string} newDate - New date for the booking
  * @param {string} newTime - New time for the booking
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, messageSid?: string, error?: string}>}
  */
 async function sendRescheduleConfirmationSMS(booking, newDate, newTime) {
   const phoneNumber = formatPhoneNumber(booking.clientPhone);
@@ -160,15 +166,18 @@ async function sendRescheduleConfirmationSMS(booking, newDate, newTime) {
   return await sendSMS(phoneNumber, message);
 }
 
+// Alias for backward compatibility
+const sendRescheduleNotificationSMS = sendRescheduleConfirmationSMS;
+
 /**
  * Send payment confirmation SMS
  * @param {Object} booking - Booking object with payment details
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, messageSid?: string, error?: string}>}
  */
 async function sendPaymentConfirmationSMS(booking) {
   const phoneNumber = formatPhoneNumber(booking.clientPhone);
   // packageAmount is in cents, estimatedCost is in dollars
-  const amount = booking.packageAmount 
+  const amount = booking.packageAmount
     ? (booking.packageAmount / 100).toFixed(2)
     : (booking.estimatedCost || 0).toFixed(2);
   const eventDate = new Date(booking.eventDate).toLocaleDateString('en-AU', {
@@ -188,7 +197,7 @@ async function sendPaymentConfirmationSMS(booking) {
  * @param {Object} booking - Booking object
  * @param {number} refundAmount - Refund amount in cents
  * @param {string} refundReason - Reason for refund
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, messageSid?: string, error?: string}>}
  */
 async function sendCancellationSMS(booking, refundAmount, refundReason) {
   const phoneNumber = formatPhoneNumber(booking.clientPhone);
@@ -202,9 +211,10 @@ async function sendCancellationSMS(booking, refundAmount, refundReason) {
 /**
  * Send reminder SMS for upcoming booking
  * @param {Object} booking - Booking object
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+ * @param {number} [daysUntil] - Days until the event (used to customise message text)
+ * @returns {Promise<{success: boolean, messageSid?: string, error?: string}>}
  */
-async function sendBookingReminderSMS(booking) {
+async function sendBookingReminderSMS(booking, daysUntil) {
   const phoneNumber = formatPhoneNumber(booking.clientPhone);
   const eventDate = new Date(booking.eventDate).toLocaleDateString('en-AU', {
     weekday: 'long',
@@ -213,7 +223,15 @@ async function sendBookingReminderSMS(booking) {
     day: 'numeric'
   });
 
-  const message = `Hi ${booking.clientName}! Reminder: Your ${booking.package} session is tomorrow (${eventDate}) at ${booking.startTime} at ${booking.location}. Looking forward to seeing you! - Ami Photography`;
+  const reminderText = daysUntil === 0
+    ? 'today'
+    : daysUntil === 1
+      ? 'tomorrow'
+      : daysUntil != null
+        ? `in ${daysUntil} days`
+        : 'soon';
+
+  const message = `Hi ${booking.clientName}! Reminder: Your ${booking.package} session is ${reminderText} (${eventDate}) at ${booking.startTime} at ${booking.location}. Looking forward to seeing you! - Ami Photography`;
 
   return await sendSMS(phoneNumber, message);
 }
@@ -222,11 +240,13 @@ module.exports = {
   sendSMS,
   formatPhoneNumber,
   maskPhoneNumber,
+  isTwilioConfigured,
+  twilioEnabled,
   sendBookingConfirmationSMS,
   sendBookingStatusChangeSMS,
   sendRescheduleConfirmationSMS,
+  sendRescheduleNotificationSMS,
   sendPaymentConfirmationSMS,
   sendCancellationSMS,
-  sendBookingReminderSMS,
-  twilioEnabled
+  sendBookingReminderSMS
 };
