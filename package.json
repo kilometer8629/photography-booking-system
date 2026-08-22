@@ -46,11 +46,8 @@
     "nodemailer": "^9.0.1",
     "pdfkit": "^0.19.1",
     "stripe": "^14.19.0",
-<<<<<<< HEAD
-=======
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
->>>>>>> origin/main
     "twilio": "^5.10.3",
     "uuid": "^11.1.0"
   },

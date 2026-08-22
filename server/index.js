@@ -53,28 +53,16 @@ const { buildSlotsForDay, filterSlots } = require('./utils/slots');
 const Stripe = require('stripe');
 const {
   sendBookingConfirmationSMS,
-<<<<<<< HEAD
-  sendPaymentConfirmationSMS,
-  sendRescheduleNotificationSMS,
-  sendCancellationSMS,
-  sendBookingReminderSMS,
-  isTwilioConfigured
-} = require('./services/twilioClient');
-
-// Utility function to mask phone numbers in logs for security
-const maskPhoneNumber = (phone) => {
-  if (!phone || phone.length < 4) return '***';
-  return phone.slice(0, -4).replace(/\d/g, '*') + phone.slice(-4);
-};
-=======
   sendBookingStatusChangeSMS,
+  sendRescheduleNotificationSMS,
   sendRescheduleConfirmationSMS,
   sendPaymentConfirmationSMS,
   sendCancellationSMS,
+  sendBookingReminderSMS,
   maskPhoneNumber,
+  isTwilioConfigured,
   twilioEnabled
 } = require('./services/twilioClient');
->>>>>>> origin/main
 
 // ===== Import Models =====
 const { Booking, Message, Admin, SMS } = require('./models');
@@ -394,11 +382,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
         }
 
         // Send payment confirmation SMS
-<<<<<<< HEAD
-        if (booking.clientPhone && isTwilioConfigured()) {
-=======
         if (booking.clientPhone && twilioEnabled) {
->>>>>>> origin/main
           const smsResult = await sendPaymentConfirmationSMS(booking);
           if (smsResult.success) {
             console.log(`✅ Payment confirmation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
@@ -1004,19 +988,11 @@ app.post('/api/customer/reschedule', csrfProtection, async (req, res) => {
     const rescheduleTemplate = getRescheduleEmailTemplate(booking, newDate, newTime, reason);
     await sendConfirmationEmail(booking.clientEmail, rescheduleTemplate);
 
-<<<<<<< HEAD
-    // Send reschedule SMS notification
-    if (booking.clientPhone && isTwilioConfigured()) {
-      const smsResult = await sendRescheduleNotificationSMS(booking, newDate, newTime);
-      if (smsResult.success) {
-        console.log(`✅ Reschedule SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
-=======
     // Send reschedule confirmation SMS
     if (booking.clientPhone && twilioEnabled) {
       const smsResult = await sendRescheduleConfirmationSMS(booking, newDate, newTime);
       if (smsResult.success) {
         console.log(`✅ Reschedule confirmation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
->>>>>>> origin/main
       } else {
         console.warn(`⚠️ Failed to send reschedule SMS: ${smsResult.error}`);
       }
@@ -1080,15 +1056,9 @@ app.post('/api/customer/cancel', csrfProtection, async (req, res) => {
     const cancellationTemplate = getCancellationEmailTemplate(booking, refundAmount, refundReason);
     await sendConfirmationEmail(booking.clientEmail, cancellationTemplate);
 
-<<<<<<< HEAD
-    // Send cancellation SMS notification
-    if (booking.clientPhone && isTwilioConfigured()) {
-      const smsResult = await sendCancellationSMS(booking, refundAmount);
-=======
     // Send cancellation SMS
     if (booking.clientPhone && twilioEnabled) {
       const smsResult = await sendCancellationSMS(booking, refundAmount, refundReason);
->>>>>>> origin/main
       if (smsResult.success) {
         console.log(`✅ Cancellation SMS sent to ${maskPhoneNumber(booking.clientPhone)}`);
       } else {
@@ -1520,20 +1490,6 @@ app.post('/api/admin/messages/:id/mark-read', csrfProtection, async (req, res) =
   }
 });
 
-<<<<<<< HEAD
-// ===== SMS Notification Endpoints =====
-
-// Send booking reminder SMS
-app.post('/api/admin/bookings/:id/send-reminder', csrfProtection, async (req, res) => {
-  try {
-    if (!req.params.id || req.params.id === 'undefined') {
-      return res.status(400).json({ error: 'Invalid booking ID' });
-    }
-
-    if (!isTwilioConfigured()) {
-      return res.status(503).json({ 
-        error: 'SMS service not configured',
-=======
 // ===== SMS Management Routes =====
 
 // Get all SMS messages
@@ -1588,7 +1544,7 @@ app.get('/api/admin/sms/:id', isAuthenticated, async (req, res) => {
   }
 });
 
-// Send SMS
+// Send custom SMS (admin)
 app.post('/api/admin/sms/send', csrfProtection, async (req, res) => {
   try {
     const { bookingId, phoneNumber, message, messageType, recipientName } = req.body;
@@ -1600,7 +1556,7 @@ app.post('/api/admin/sms/send', csrfProtection, async (req, res) => {
       });
     }
 
-    if (!twilioConfigured) {
+    if (!twilioEnabled) {
       return res.status(503).json({ 
         error: 'SMS service is not configured. Please configure Twilio settings.',
         csrfToken: req.csrfToken()
@@ -1623,8 +1579,8 @@ app.post('/api/admin/sms/send', csrfProtection, async (req, res) => {
       const result = await sendSMS(phoneNumber, message);
       
       smsRecord.status = 'sent';
-      smsRecord.twilioSid = result.sid;
-      smsRecord.sentAt = result.sentAt;
+      smsRecord.twilioSid = result.messageSid;
+      smsRecord.sentAt = new Date();
       
       await smsRecord.save();
 
@@ -1660,14 +1616,114 @@ app.post('/api/admin/bookings/:id/send-sms', csrfProtection, async (req, res) =>
     if (!req.params.id || req.params.id === 'undefined') {
       return res.status(400).json({ 
         error: 'Invalid booking ID',
->>>>>>> origin/main
         csrfToken: req.csrfToken()
       });
     }
 
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
-<<<<<<< HEAD
+      return res.status(404).json({ 
+        error: 'Booking not found',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    const { messageType, customMessage, delayMinutes, newDate, newTime } = req.body;
+
+    if (!twilioEnabled) {
+      return res.status(503).json({ 
+        error: 'SMS service is not configured',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    // Create message from template or use custom message
+    let message;
+    if (messageType && messageType !== 'custom') {
+      message = createMessageTemplate(messageType, {
+        clientName: booking.clientName,
+        eventType: booking.eventType,
+        eventDate: new Date(booking.eventDate).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' }),
+        startTime: booking.startTime,
+        location: booking.location,
+        delayMinutes,
+        newDate,
+        newTime
+      });
+    } else {
+      message = customMessage;
+    }
+
+    if (!message) {
+      return res.status(400).json({ 
+        error: 'Message content is required',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    // Create SMS record
+    const smsRecord = new SMS({
+      bookingId: booking._id,
+      phoneNumber: booking.clientPhone,
+      message,
+      messageType: messageType || 'custom',
+      recipientName: booking.clientName,
+      sentBy: req.session.admin.username,
+      status: 'pending'
+    });
+
+    // Send SMS via Twilio
+    try {
+      const result = await sendSMS(booking.clientPhone, message);
+      
+      smsRecord.status = 'sent';
+      smsRecord.twilioSid = result.messageSid;
+      smsRecord.sentAt = new Date();
+      
+      await smsRecord.save();
+
+      res.json({
+        success: true,
+        message: 'SMS sent successfully to customer',
+        sms: smsRecord,
+        csrfToken: req.csrfToken()
+      });
+    } catch (twilioError) {
+      smsRecord.status = 'failed';
+      smsRecord.errorMessage = twilioError.message;
+      await smsRecord.save();
+
+      res.status(500).json({
+        success: false,
+        error: `Failed to send SMS: ${twilioError.message}`,
+        csrfToken: req.csrfToken()
+      });
+    }
+  } catch (error) {
+    console.error('Send booking SMS error:', error);
+    res.status(500).json({
+      error: 'Failed to send SMS to customer',
+      csrfToken: req.csrfToken()
+    });
+  }
+});
+
+// Send booking reminder SMS
+app.post('/api/admin/bookings/:id/send-reminder', csrfProtection, async (req, res) => {
+  try {
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ error: 'Invalid booking ID' });
+    }
+
+    if (!twilioEnabled) {
+      return res.status(503).json({ 
+        error: 'SMS service not configured',
+        csrfToken: req.csrfToken()
+      });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
@@ -1716,27 +1772,13 @@ app.post('/api/admin/bookings/:id/send-confirmation-sms', csrfProtection, async 
       return res.status(400).json({ error: 'Invalid booking ID' });
     }
 
-    if (!isTwilioConfigured()) {
+    if (!twilioEnabled) {
       return res.status(503).json({ 
         error: 'SMS service not configured',
-=======
-      return res.status(404).json({ 
-        error: 'Booking not found',
         csrfToken: req.csrfToken()
       });
     }
 
-    const { messageType, customMessage, delayMinutes, newDate, newTime } = req.body;
-
-    if (!twilioConfigured) {
-      return res.status(503).json({ 
-        error: 'SMS service is not configured',
->>>>>>> origin/main
-        csrfToken: req.csrfToken()
-      });
-    }
-
-<<<<<<< HEAD
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ error: 'Booking not found' });
@@ -1755,106 +1797,39 @@ app.post('/api/admin/bookings/:id/send-confirmation-sms', csrfProtection, async 
       res.status(500).json({
         success: false,
         error: smsResult.error,
-=======
-    // Create message from template or use custom message
-    let message;
-    if (messageType && messageType !== 'custom') {
-      message = createMessageTemplate(messageType, {
-        clientName: booking.clientName,
-        eventType: booking.eventType,
-        eventDate: new Date(booking.eventDate).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' }),
-        startTime: booking.startTime,
-        location: booking.location,
-        delayMinutes,
-        newDate,
-        newTime
-      });
-    } else {
-      message = customMessage;
-    }
-
-    if (!message) {
-      return res.status(400).json({ 
-        error: 'Message content is required',
-        csrfToken: req.csrfToken()
-      });
-    }
-
-    // Create SMS record
-    const smsRecord = new SMS({
-      bookingId: booking._id,
-      phoneNumber: booking.clientPhone,
-      message,
-      messageType: messageType || 'custom',
-      recipientName: booking.clientName,
-      sentBy: req.session.admin.username,
-      status: 'pending'
-    });
-
-    // Send SMS via Twilio
-    try {
-      const result = await sendSMS(booking.clientPhone, message);
-      
-      smsRecord.status = 'sent';
-      smsRecord.twilioSid = result.sid;
-      smsRecord.sentAt = result.sentAt;
-      
-      await smsRecord.save();
-
-      res.json({
-        success: true,
-        message: 'SMS sent successfully to customer',
-        sms: smsRecord,
-        csrfToken: req.csrfToken()
-      });
-    } catch (twilioError) {
-      smsRecord.status = 'failed';
-      smsRecord.errorMessage = twilioError.message;
-      await smsRecord.save();
-
-      res.status(500).json({
-        success: false,
-        error: `Failed to send SMS: ${twilioError.message}`,
->>>>>>> origin/main
         csrfToken: req.csrfToken()
       });
     }
   } catch (error) {
-<<<<<<< HEAD
     console.error('Send confirmation SMS error:', error);
     res.status(500).json({
       error: 'Failed to send confirmation SMS',
-=======
-    console.error('Send booking SMS error:', error);
-    res.status(500).json({
-      error: 'Failed to send SMS to customer',
->>>>>>> origin/main
       csrfToken: req.csrfToken()
     });
   }
 });
 
-<<<<<<< HEAD
-// Get SMS service status
+// Get SMS service status (masked for security)
 app.get('/api/admin/sms/status', async (req, res) => {
   try {
     res.json({
-      configured: isTwilioConfigured(),
-      phoneNumber: isTwilioConfigured() ? process.env.TWILIO_PHONE_NUMBER?.slice(0, -4).replace(/\d/g, '*') + process.env.TWILIO_PHONE_NUMBER?.slice(-4) : null,
-      accountSid: isTwilioConfigured() ? process.env.TWILIO_ACCOUNT_SID?.substring(0, 6) + '...' : null
+      configured: twilioEnabled,
+      phoneNumber: twilioEnabled ? process.env.TWILIO_PHONE_NUMBER?.slice(0, -4).replace(/\d/g, '*') + process.env.TWILIO_PHONE_NUMBER?.slice(-4) : null,
+      accountSid: twilioEnabled ? process.env.TWILIO_ACCOUNT_SID?.substring(0, 6) + '...' : null
     });
   } catch (error) {
     console.error('SMS status check error:', error);
     res.status(500).json({ error: 'Failed to check SMS status' });
   }
-=======
+});
+
 // Get SMS templates
 app.get('/api/admin/sms/templates', (req, res) => {
   res.json({
     templates: [
       { id: 'reminder', name: 'Appointment Reminder', description: 'Send a reminder about upcoming appointment' },
       { id: 'confirmation', name: 'Booking Confirmation', description: 'Confirm a booking' },
-      { id: 'running_late', name: 'Running Late', description: 'Notify customer you\'re running late' },
+      { id: 'running_late', name: 'Running Late', description: "Notify customer you're running late" },
       { id: 'rescheduled', name: 'Rescheduled', description: 'Notify about rescheduled appointment' },
       { id: 'cancelled', name: 'Cancelled', description: 'Notify about cancelled appointment' },
       { id: 'custom', name: 'Custom Message', description: 'Send a custom message' }
@@ -1873,13 +1848,12 @@ function requireAdminAuth(req, res, next) {
 // Check Twilio configuration status
 app.get('/api/admin/sms/config-status', requireAdminAuth, (req, res) => {
   res.json({
-    configured: twilioConfigured,
-    phoneNumber: twilioConfigured ? process.env.TWILIO_PHONE_NUMBER : null
+    configured: twilioEnabled,
+    phoneNumber: twilioEnabled ? process.env.TWILIO_PHONE_NUMBER?.slice(0, -4).replace(/\d/g, '*') + process.env.TWILIO_PHONE_NUMBER?.slice(-4) : null
   });
->>>>>>> origin/main
 });
 
-// ===== Email Configuration =====
+// ===== Email Configuration =====// ===== Email Configuration =====
 const emailTransporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: process.env.EMAIL_PORT,
